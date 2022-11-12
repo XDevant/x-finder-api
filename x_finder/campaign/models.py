@@ -1,4 +1,5 @@
 from django.db import models
+from core.models import Source
 
 
 class Deity(models.Model):
