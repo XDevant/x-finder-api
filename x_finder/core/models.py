@@ -38,6 +38,18 @@ class Language(models.Model):
     )
 
 
+class Trait(models.Model):
+    name = models.CharField(max_length=25)
+    nethys_url = models.URLField()
+    source = models.ForeignKey(
+        to=Source,
+        on_delete=models.PROTECT,
+        related_name='language_source'
+    )
+    source_page = models.IntegerField()
+    description = models.TextField()
+
+
 class Domain(models.Model):
     name = models.CharField(max_length=25)
 

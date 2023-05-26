@@ -5,6 +5,9 @@ source_url = "https://2e.aonprd.com/Sources.aspx"
 
 
 class SourceSoup(SoupKitchen):
+    """
+    A soup kitchen specific for sources extraction that creates a csv/df matching the model.
+    """
     def norm_df(self, df):
         return df
 
@@ -32,10 +35,16 @@ class SourceSoup(SoupKitchen):
                   inplace=True)
         return df
 
+    @staticmethod
+    def cook():
+        bowl = SourceSoup("Sources.aspx",
+                          app="core",
+                          text_complement_columns=["Latest Errata"],
+                          url_complement_columns=["Product Page", "Latest Errata"],
+                          tail_start='<br>')
+        return bowl
+
 
 if __name__ == "__main__":
-    bowl = SourceSoup("Sources.aspx",
-                      app="core",
-                      text_complement_columns=["Latest Errata"],
-                      url_complement_columns=["Product Page", "Latest Errata"],
-                      tail_start='<br>')
+    # SourceSoup.cook()
+    pass

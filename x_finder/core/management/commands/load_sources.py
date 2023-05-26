@@ -5,7 +5,7 @@ from core.scrapping import SourceSoup
 
 
 class Command(BaseCommand):
-    help = 'build and load source df in db'
+    help = 'build and load source df in db, save df in csv'
 
     def add_arguments(self, parser):
         pass
