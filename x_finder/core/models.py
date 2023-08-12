@@ -44,7 +44,7 @@ class Trait(models.Model):
     source = models.ForeignKey(
         to=Source,
         on_delete=models.PROTECT,
-        related_name='language_source'
+        related_name='trait_source'
     )
     source_page = models.IntegerField()
     description = models.TextField()
