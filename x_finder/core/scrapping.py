@@ -1,15 +1,20 @@
-from utils.scrapp import SoupKitchen
+from x_finder.utils.scrapp import SoupKitchen, BASE_DIR
+from x_finder.utils.fixtures.args import item_category_arguments as ica
 
 
-source_url = "https://2e.aonprd.com/Sources.aspx"
+item_category_arguments = ica
+"""
+ICA is a dictionary whose keys are item catégories matching our model names.
+The values are dictionaries where each key, value pair is a parameter used to
+find data in an item's page. Column names and HTML tags mostly.
+They should only be changed if the target site front end change overtime.
+"""
 
 
 class SourceSoup(SoupKitchen):
     """
     A soup kitchen specific for sources extraction that creates a csv/df matching the model.
     """
-    def norm_df(self, df):
-        return df
 
     @staticmethod
     def format_df(df):
@@ -37,14 +42,22 @@ class SourceSoup(SoupKitchen):
 
     @staticmethod
     def cook():
-        bowl = SourceSoup("Sources.aspx",
-                          app="core",
-                          text_complement_columns=["Latest Errata"],
-                          url_complement_columns=["Product Page", "Latest Errata"],
-                          tail_start='<br>')
+        bowl = SourceSoup("Sources.aspx")
         return bowl
+
+
+class ItemSoup(SoupKitchen):
+    @staticmethod
+    def format_df(df):
+        return df
 
 
 if __name__ == "__main__":
     # SourceSoup.cook()
-    pass
+    soup = SoupKitchen("Sources.aspx?ID=1")
+    # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
+    #  soup.norm_dfs()
+    # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
+    soup.load_source_items()
+    # soup = SoupKitchen("Traits.aspx?ID=135")
+    # soup.parse_item_data(show=True, category="traits")

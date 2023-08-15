@@ -1,71 +1,57 @@
-from django.conf import settings
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
+from pathlib import Path
+from x_finder.utils.fixtures.args import item_category_arguments as ica
 
-BASE_DIR = settings.BASE_DIR
+
+item_category_arguments = ica
+
+
 BASE_URL = "https://2e.aonprd.com/"
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class SoupKitchen:
     base_url = BASE_URL
     nav_links = None
     df = None
+    list_df = None
     parsed_rows = None
-    text_complement_columns = []
-    url_complement_columns = []
     dfs = []
 
     def __init__(self,
-                 url,
-                 app="soup",
-                 table=False,
-                 sub_tables=True,
-                 save=True,
-                 item_url_column='Name',
-                 text_complement_columns=None,
-                 url_complement_columns=None,
-                 separator='<br/><b>',
-                 start='</h1><b>',
-                 end='<h2',
-                 delimiter='</b>',
-                 tail_start=None):
-        self.item_url_column = item_url_column
-        if text_complement_columns:
-            self.text_complement_columns = text_complement_columns
-        if url_complement_columns:
-            self.url_complement_columns = url_complement_columns
-        self.separator = separator
-        self.start = start
-        self.end = end
-        self.delimiter = delimiter
-        self.tail_start = tail_start
+                 url):
         self.content = requests.get(self.base_url + url).content
         self.raw_soup = BeautifulSoup(self.content, 'html.parser')
-        self.soup = self.raw_soup.prettify()
-        self.app = app
-        self.table = table
-        self.sub_tables = sub_tables
-        self.save = save
+        self.raw_soup.prettify()
         self.name = url.split('.')[0]
         """
-        if self.sub_tables:
-            self.extract_nav_links()
-        if self.table:
-            self.load_table()
-        if not self.sub_tables and not self.table:
-            self.load_source_items()
         if self.save:
             self.df_to_csv(f"{BASE_DIR}\\{self.app}\\fixtures\\{self.name}_raw.csv", self.df)
         """
 
     def __str__(self):
-        return self.soup
+        return self.raw_soup
 
-    def save(self):
-        self.df_to_csv(f"{BASE_DIR}\\{self.app}\\fixtures\\{self.name}_raw.csv", self.df)
+    @staticmethod
+    def get(argument, category="default"):
+        if category in item_category_arguments.keys() and argument in item_category_arguments[category].keys():
+            return item_category_arguments[category][argument]
+        if argument in item_category_arguments["default"].keys():
+            return item_category_arguments["default"][argument]
+        return None
+
+    def save(self, prefix="", suffix="", app="utils"):
+        if prefix:
+            prefix += "_"
+        if suffix:
+            suffix = "_" + suffix
+        self.df_to_csv(f"{BASE_DIR}\\{app}\\fixtures\\csv\\{prefix}{self.name}{suffix}_raw.csv", self.df)
 
     def extract_nav_links(self):
+        """ If our table is split among sub-tables, we fetch their urls.
+        We store their names / urls as key / value pairs in a dict """
         main = self.raw_soup.find(id="main").span
         nav_links = main.find_all('a')
         self.nav_links = {link.get_text(): link['href'] for link in nav_links}
@@ -75,27 +61,31 @@ class SoupKitchen:
         """Overload in child if needed"""
         print(self.nav_links)
 
-    def load_table(self):
+    def load_table(self, category="default"):
         table = self.raw_soup.find(id="main").find('table')
         table_rows = table.find_all('tr')
         if len(table_rows) <= 1:
+            print("table not found")
             return 0
         headers = [self.format_column_name(th.get_text()) for th in table_rows[0].find_all('th')]
         if len(headers) == 0:
+            print("headers not found")
             return 0
 
+        item_url_col = self.get("item_url_column", category)
+        text_cols = self.get("text_columns", category)
+        url_cols = self.get("url_columns", category)
         url_index = -1
-        if self.item_url_column:
+        if item_url_col:
             headers += ["nethys_url"]
             try:
-                url_index = headers.index(self.item_url_column)
+                url_index = headers.index(item_url_col)
             except ValueError:
                 pass
-
-            if self.text_complement_columns:
-                headers += [self.format_column_name(n) for n in self.text_complement_columns]
-            if self.url_complement_columns:
-                headers += [self.format_column_name(n, url=True) for n in self.url_complement_columns]
+            if text_cols:
+                headers += [self.format_column_name(n) for n in text_cols]
+            if url_cols:
+                headers += [self.format_column_name(n, url=True) for n in url_cols]
 
         df = pd.DataFrame(columns=headers)
         for i in range(1, len(table_rows)):
@@ -104,75 +94,112 @@ class SoupKitchen:
             if url_index >= 0:
                 item_url = raw_row[url_index].a['href']
                 row.append(item_url)
-                if self.text_complement_columns or self.url_complement_columns:
-                    new_bowl = SoupKitchen(item_url,
-                                           table=False,
-                                           sub_tables=False,
-                                           save=False,
-                                           item_url_column=self.item_url_column,
-                                           text_complement_columns=self.text_complement_columns,
-                                           url_complement_columns=self.url_complement_columns,
-                                           separator=self.separator,
-                                           start=self.start,
-                                           end=self.end,
-                                           delimiter=self.delimiter,
-                                           tail_start=self.tail_start)
-                    new_bowl.parse_item_data()
-                    for column in self.text_complement_columns:
+                if text_cols or url_cols:
+                    new_bowl = SoupKitchen(item_url)
+                    new_bowl.parse_item_data(category=category)
+                    for column in text_cols:
                         row.append(new_bowl.get_item_data(column))
-                    for column in self.url_complement_columns:
+                    for column in url_cols:
                         row.append(new_bowl.get_item_data(column, url=True))
+
             df.loc[i] = row
         self.df = df
 
-    def load_sub_tables(self):
+    def load_sub_tables(self, category="default"):
+        """After nav link extraction we load each table using load_table
+        then contact all in one df"""
         for key, url in self.nav_links.items():
-            sub_bowl = SoupKitchen(url,
-                                   table=True,
-                                   sub_tables=False,
-                                   save=False,
-                                   item_url_column=self.item_url_column,
-                                   text_complement_columns=self.text_complement_columns,
-                                   url_complement_columns=self.url_complement_columns,
-                                   separator=self.separator,
-                                   start=self.start,
-                                   end=self.end,
-                                   delimiter=self.delimiter,
-                                   tail_start=self.tail_start)
-            sub_bowl.load_table()
+            sub_bowl = SoupKitchen(url)
+            sub_bowl.load_table(category=category)
             sub_bowl.df["Category"] = [key] * len(sub_bowl.df)
-            sub_bowl.norm_df()
             self.dfs.append(sub_bowl.df)
-            print(key)
         self.df = pd.concat(self.dfs)
 
-    def load_source_items(self):
+    def load_source_items(self, update=False, offset=3):
         items = self.raw_soup.find(id="main").find_all('u')
-        columns = ["name", "category", "url"]
-        df = pd.DataFrame(columns=columns)
-        for item in items:
+        base_columns = ["name", "nethys_url"]
+        category_data = {}
+        name = self.raw_soup.find(id="main").find(class_="title").a.get_text()
+        for item in items[offset:]:
             item = item.a
-            item_url = item['href']
-            item_category = item_url.split('.')[0].lower()
-            df += [item.get_text(), item_category, item_url]
+            if item:
+                item_data = [item.get_text(), item['href']]
+                item_category = item_data[-1].split('.')[0].lower()
+                if item_category not in category_data.keys():
+                    category_data[item_category] = []
+                    print(f"Adding {item_category} to data dict.")
+                if item_category in item_category_arguments.keys():
+                    try:
+                        item_bowl = SoupKitchen(item_data[1])
+                    except requests.exceptions.ConnectTimeout:
+                        print(f"Connection Timeout for {item_data}")
+                        continue
+                    item_bowl.parse_item_data(category=item_category)
+                    for header in self.get("text_columns", item_category):
+                        item_data.append(item_bowl.get_item_data(header))
+                    for header in self.get("url_columns", item_category):
+                        item_data.append(item_bowl.get_item_data(header, url=True))
+                category_data[item_category].append(item_data)
+            else:
+                print(f"{item} contains no link")
+        if update:
+            name += "_update"
+        dfs = {}
+        for key in category_data.keys():
+            text_cols = [self.format_column_name(n) for n in self.get("text_columns", key)]
+            url_cols = [self.format_column_name(n, url=True) for n in self.get("url_columns", key)]
+            columns = base_columns + text_cols + url_cols
+            dfs[key] = pd.DataFrame(data=category_data[key], columns=columns)
+            self.list_df = dfs
+            try:
+                self.norm_dfs()
+            except Exception:
+                print("An error occurred while norming dfs")
+                pass
+            app = self.get("app", key)
+            dfs[key].to_csv(f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}\\{key}_items_raw.csv",
+                            sep='|',
+                            index=False)
 
-    def norm_df(self):
-        return self.df
+    def norm_dfs(self):
+        for key in self.list_df.keys():
+            df = self.list_df[key]
+            if self.get("subtype", key) and "name" in df.columns:
+                df["subtype"] = df.apply(
+                    lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
+                    axis=1)
+                df["name"] = df.apply(lambda r: r["name"].split('(')[0].strip(), axis=1)
+            if "description" not in df.columns and "other" in df.columns:
+                df.rename(columns={"other": "description"}, inplace=True)
+            if "source" in df.columns and "source_page" not in df.columns:
+                df["source_page"] = df.apply(
+                 lambda r: int(r["source"].split('pg. ')[-1].split(' ')[0].strip()) if 'pg. ' in r["source"] else 0,
+                 axis=1)
+                df["source"] = df.apply(lambda r: r["source"].split('pg. ')[0].strip(), axis=1)
 
-    def parse_item_data(self):
+    def parse_item_data(self, show=False, category="default"):
+        """Once our table or list of items is loaded, we need often need to
+        fetch additional data on the item's page. Here we parse that page
+        thanks to the markup provided to the constructor."""
+        args = ["start", "end", "row_separator", "cell_separator", "tail_start"]
+        start, end, row, cell, tail = (self.get(arg, category) for arg in args)
         data = self.raw_soup.find(id="main")
-        data = str(data).split(self.start)[-1].split(self.end)[0]
-        rows = data.split(self.separator)
+        data = str(data).split(start)[-1].split(end)[0]
+        rows = data.split(row)
         other = ""
-        if self.tail_start and self.tail_start in rows[-1]:
-            last = rows[-1].split(self.tail_start)
+        if tail and tail in rows[-1]:
+            last = rows[-1].split(tail)
             rows = rows[:-1] + last[:1]
-            other = " ".join(self.end[1:])
-        parsed_rows = {r.split(self.delimiter)[0]: r.split(self.delimiter)[1] for r in rows}
-        parsed_rows["other"] = other
+            other = " ".join(last[1:])
+        parsed_rows = {r.split(cell)[0]: r.split(cell)[1] for r in rows}
+        parsed_rows["Other"] = other
         self.parsed_rows = parsed_rows
+        if show:
+            print(self.parsed_rows)
 
     def get_item_data(self, header, url=False):
+        """Here we use the missing columns' headers given to the constructor to fetch
+        the item data missing."""
         if self.parsed_rows and header in self.parsed_rows.keys():
             value = BeautifulSoup(self.parsed_rows[header], 'html.parser')
             if value:
@@ -201,7 +228,7 @@ class SoupKitchen:
         suffix = ""
         if raw:
             suffix = "_raw"
-        pathfile = f"{BASE_DIR}\\{app}\\fixtures\\{name}{suffix}.csv"
+        pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}{suffix}.csv"
         df = pd.read_csv(pathfile, delimiter="|")
         return df
 
@@ -217,4 +244,5 @@ class SoupKitchen:
 
 
 if __name__ == "__main__":
-    pass
+    bowl = SoupKitchen("Sources.aspx?ID=1")
+    bowl.load_source_items()

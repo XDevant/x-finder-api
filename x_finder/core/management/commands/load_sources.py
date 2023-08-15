@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from core.models import Source
-from core.scrapping import SourceSoup
+from x_finder.core.models import Source
+from x_finder.core.scrapping import SourceSoup
 
 
 class Command(BaseCommand):
