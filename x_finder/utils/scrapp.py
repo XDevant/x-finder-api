@@ -191,6 +191,13 @@ class SoupKitchen:
                     lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
                     axis=1)
                 df["name"] = df.apply(lambda r: r["name"].split('(')[0].strip(), axis=1)
+            if "spell_level" in df.columns:
+                df["spell_type"] = df.apply(
+                    lambda r: r["spell_level"].split(' ')[0].strip(),
+                    axis=1)
+                df["spell_level"] = df.apply(
+                    lambda r: int(r["spell_level"].split(' ')[-1].strip()),
+                    axis=1)
             if "description" not in df.columns and "other" in df.columns:
                 df.rename(columns={"other": "description"}, inplace=True)
             if "source" in df.columns and "source_page" not in df.columns:
@@ -235,13 +242,23 @@ class SoupKitchen:
         parsed_rows = {row.split(cell)[0]: row.split(cell)[1] for row in rows if cell in row}
         parsed_rows["Other"] = other
         if traits:
-            datas = [raw_data.find(class_="traituncommon")] + [raw_data.find(class_="traitrare")]
-            datas += [raw_data.find(class_="traitunique")] + raw_data.find_all(class_="trait")
-            data = "!".join([data.a.get_text() for data in datas if data is not None])
-            parsed_rows["Traits"] = data
+            parsed_rows["Traits"] = self.find_traits(raw_data)
+        if category in ["spells"]:
+            parsed_rows["Spell Level"] = self.find_level(raw_data)
         self.parsed_rows = parsed_rows
         if show:
             print(self.parsed_rows)
+
+    @staticmethod
+    def find_traits(data):
+        datas = [data.find(class_="traituncommon")] + [data.find(class_="traitrare")]
+        datas += [data.find(class_="traitunique")] + data.find_all(class_="trait")
+        return "!".join([data.a.get_text() for data in datas if data is not None])
+
+    @staticmethod
+    def find_level(data):
+        title = str(data).split('<span style="margin-left:auto; margin-right:0">')[-1].split('</span>')[0]
+        return title
 
     def get_item_data(self, header, url=False):
         """Here we use the missing columns' headers given to the constructor to fetch
