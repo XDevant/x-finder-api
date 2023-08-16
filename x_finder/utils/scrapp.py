@@ -120,7 +120,7 @@ class SoupKitchen:
         base_columns = ["name", "nethys_url"]
         category_data = {}
         name = self.raw_soup.find(id="main").find(class_="title").a.get_text()
-        for item in items[offset:]:
+        for item in items[offset:2280]:
             item = item.a
             if item:
                 item_data = [item.get_text(), item['href']]
@@ -134,11 +134,24 @@ class SoupKitchen:
                     except requests.exceptions.ConnectTimeout:
                         print(f"Connection Timeout for {item_data}")
                         continue
-                    item_bowl.parse_item_data(category=item_category)
-                    for header in self.get("text_columns", item_category):
+                    texts = self.get("text_columns", item_category)
+                    urls = self.get("url_columns", item_category)
+                    item_bowl.parse_item_data(category=item_category, show=True)
+                    for header in texts:
                         item_data.append(item_bowl.get_item_data(header))
-                    for header in self.get("url_columns", item_category):
+                    for header in urls:
                         item_data.append(item_bowl.get_item_data(header, url=True))
+                    pickup = []
+                    heighten = []
+                    for key, value in item_bowl.parsed_rows.items():
+                        if key not in base_columns + texts + urls:
+                            part = f"{key}: {self.clean(value)}"
+                            if "Heightened" in key:
+                                heighten.append(part)
+                            else:
+                                pickup.append(part)
+                    item_data.append("; ".join(pickup))
+                    item_data.append("; ".join(heighten))
                 category_data[item_category].append(item_data)
             else:
                 print(f"{item} contains no link")
@@ -149,6 +162,8 @@ class SoupKitchen:
             text_cols = [self.format_column_name(n) for n in self.get("text_columns", key)]
             url_cols = [self.format_column_name(n, url=True) for n in self.get("url_columns", key)]
             columns = base_columns + text_cols + url_cols
+            if len(columns) < len(category_data[key][0]):
+                columns += ["pickup", "heightened"]
             dfs[key] = pd.DataFrame(data=category_data[key], columns=columns)
             self.list_df = dfs
             try:
@@ -160,6 +175,13 @@ class SoupKitchen:
             dfs[key].to_csv(f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}\\{key}_items_raw.csv",
                             sep='|',
                             index=False)
+
+    @staticmethod
+    def clean(value):
+        clean_value = BeautifulSoup(value, 'html.parser')
+        if clean_value:
+            text = clean_value.get_text()
+            return text.strip()
 
     def norm_dfs(self):
         for key in self.list_df.keys():
@@ -178,7 +200,7 @@ class SoupKitchen:
                 df["source"] = df.apply(lambda r: r["source"].split('pg. ')[0].strip(), axis=1)
 
     def parse_item_data(self, show=False, category="default"):
-        """Once our table or list of items is loaded, we need often need to
+        """Once our table or list of items is loaded, we often need to
         fetch additional data on the item's page. Here we parse that page
         thanks to the markup provided to the constructor."""
         args = ["start", "end", "row_separator", "cell_separator", "tail_start", "row_sep_bis", "traits"]
@@ -191,8 +213,22 @@ class SoupKitchen:
             data = data.replace(row, row2)
             row = row2
         rows = data.split(row)
+
         other = ""
-        if tail and tail in rows[-1]:
+        if end == "<h1984":
+            new_rows = []
+            for row in rows:
+                if ("<hr/>" not in row and "<hr>" not in row) or other:
+                    new_rows.append(row)
+                else:
+                    if "<hr/>" in row:
+                        sliced_row = row.split("<hr/>")
+                    else:
+                        sliced_row = row.split("<hr>")
+                        new_rows.append(sliced_row[0])
+                    other += sliced_row[1]
+            rows = new_rows
+        elif tail and tail in rows[-1]:
             last = rows[-1].split(tail)
             rows = rows[:-1] + last[:1]
             other = " ".join(last[1:])
@@ -210,7 +246,7 @@ class SoupKitchen:
     def get_item_data(self, header, url=False):
         """Here we use the missing columns' headers given to the constructor to fetch
         the item data missing."""
-        if self.parsed_rows and header in self.parsed_rows.keys():
+        if self.parsed_rows and header and header in self.parsed_rows.keys():
             value = BeautifulSoup(self.parsed_rows[header], 'html.parser')
             if value:
                 if url:

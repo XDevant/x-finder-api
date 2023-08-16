@@ -61,5 +61,5 @@ if __name__ == "__main__":
     soup.load_source_items()
     # soup = SoupKitchen("Traits.aspx?ID=135")
     # soup.parse_item_data(show=True, category="traits")
-    # soup = SoupKitchen("Weapons.aspx?ID=67")
-    # soup.parse_item_data(show=True, category="weapons")
+    # soup = SoupKitchen("Spells.aspx?ID=140")
+    # soup.parse_item_data(show=True, category="spells")
