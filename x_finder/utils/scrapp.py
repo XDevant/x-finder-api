@@ -181,17 +181,20 @@ class SoupKitchen:
         """Once our table or list of items is loaded, we need often need to
         fetch additional data on the item's page. Here we parse that page
         thanks to the markup provided to the constructor."""
-        args = ["start", "end", "row_separator", "cell_separator", "tail_start"]
-        start, end, row, cell, tail = (self.get(arg, category) for arg in args)
+        args = ["start", "end", "row_separator", "cell_separator", "tail_start", "row_sep_bis"]
+        start, end, row, cell, tail, row2 = (self.get(arg, category) for arg in args)
         data = self.raw_soup.find(id="main")
         data = str(data).split(start)[-1].split(end)[0]
+        if row2:
+            data = data.replace(row, row2)
+            row = row2
         rows = data.split(row)
         other = ""
         if tail and tail in rows[-1]:
             last = rows[-1].split(tail)
             rows = rows[:-1] + last[:1]
             other = " ".join(last[1:])
-        parsed_rows = {r.split(cell)[0]: r.split(cell)[1] for r in rows}
+        parsed_rows = {row.split(cell)[0]: row.split(cell)[1] for row in rows if cell in row}
         parsed_rows["Other"] = other
         self.parsed_rows = parsed_rows
         if show:
