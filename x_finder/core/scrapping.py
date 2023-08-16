@@ -54,12 +54,12 @@ class ItemSoup(SoupKitchen):
 
 if __name__ == "__main__":
     # SourceSoup.cook()
-    # soup = SoupKitchen("Sources.aspx?ID=1")
+    soup = SoupKitchen("Sources.aspx?ID=1")
     # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
     #  soup.norm_dfs()
     # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
-    # soup.load_source_items()
+    soup.load_source_items()
     # soup = SoupKitchen("Traits.aspx?ID=135")
     # soup.parse_item_data(show=True, category="traits")
-    soup = SoupKitchen("Weapons.aspx?ID=15")
-    soup.parse_item_data(show=True, category="weapons")
+    # soup = SoupKitchen("Weapons.aspx?ID=67")
+    # soup.parse_item_data(show=True, category="weapons")

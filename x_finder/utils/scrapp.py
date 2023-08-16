@@ -181,10 +181,12 @@ class SoupKitchen:
         """Once our table or list of items is loaded, we need often need to
         fetch additional data on the item's page. Here we parse that page
         thanks to the markup provided to the constructor."""
-        args = ["start", "end", "row_separator", "cell_separator", "tail_start", "row_sep_bis"]
-        start, end, row, cell, tail, row2 = (self.get(arg, category) for arg in args)
-        data = self.raw_soup.find(id="main")
-        data = str(data).split(start)[-1].split(end)[0]
+        args = ["start", "end", "row_separator", "cell_separator", "tail_start", "row_sep_bis", "traits"]
+        start, end, row, cell, tail, row2, traits = (self.get(arg, category) for arg in args)
+        raw_data = self.raw_soup.find(id="main")
+        data = str(raw_data).split(start)[1].split(end)[0]
+        if start == "<b>Source":
+            data = "Source" + data
         if row2:
             data = data.replace(row, row2)
             row = row2
@@ -196,6 +198,11 @@ class SoupKitchen:
             other = " ".join(last[1:])
         parsed_rows = {row.split(cell)[0]: row.split(cell)[1] for row in rows if cell in row}
         parsed_rows["Other"] = other
+        if traits:
+            datas = [raw_data.find(class_="traituncommon")] + [raw_data.find(class_="traitrare")]
+            datas += [raw_data.find(class_="traitunique")] + raw_data.find_all(class_="trait")
+            data = "!".join([data.a.get_text() for data in datas if data is not None])
+            parsed_rows["Traits"] = data
         self.parsed_rows = parsed_rows
         if show:
             print(self.parsed_rows)
@@ -212,7 +219,8 @@ class SoupKitchen:
                         return url
                     except TypeError:
                         return ""
-                return value.get_text()
+                text = value.get_text()
+                return text.strip()
         return ""
 
     @staticmethod
