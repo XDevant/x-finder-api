@@ -16,34 +16,33 @@ class SourceSoup(SoupKitchen):
     A soup kitchen specific for sources extraction that creates a csv/df matching the model.
     """
 
-    @staticmethod
-    def format_df(df):
-        df["release_date"] = [SoupKitchen.translate_date(date) for date in df["release_date"]]
-        df["errata_date"] = df.apply(
+    def format_df(self):
+        self.df["release_date"] = [SoupKitchen.translate_date(date) for date in df["release_date"]]
+        self.df["errata_date"] = df.apply(
             lambda r: SoupKitchen.translate_date(
                 str(r["latest_errata"]).split(' - ')[-1]
                 ) if r["latest_errata"] else None,
             axis=1)
-        df["errata_version"] = df.apply(
+        self.df["errata_version"] = df.apply(
             lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",
             axis=1)
-        df = df[["name",
-                 "group",
-                 "category",
-                 "release_date",
-                 "errata_date",
-                 "errata_version",
-                 "nethys_url",
-                 "product_page_url",
-                 "latest_errata_url"]]
-        df.rename(columns={'product_page_url': 'paizo_url', 'latest_errata_url': 'errata_url'},
-                  inplace=True)
-        return df
+        self.df.rename(columns={'product_page_url': 'paizo_url', 'latest_errata_url': 'errata_url'},
+                       inplace=True)
+        self.df = self.df[["name",
+                           "source_group",
+                           "category",
+                           "release_date",
+                           "errata_date",
+                           "errata_version",
+                           "nethys_url",
+                           "paizo_url",
+                           "errata_url"]]
 
-    @staticmethod
-    def cook():
-        bowl = SourceSoup("Sources.aspx")
-        return bowl
+    def cook(self):
+        self.extract_nav_links()
+        self.load_sub_tables()
+        self.format_df()
+        self.save("new")
 
 
 class ItemSoup(SoupKitchen):
@@ -53,13 +52,14 @@ class ItemSoup(SoupKitchen):
 
 
 if __name__ == "__main__":
-    # SourceSoup.cook()
-    soup = SoupKitchen("Sources.aspx?ID=1")
+    bowl = SourceSoup("Sources.aspx")
+    bowl.cook()
+    # soup = SoupKitchen("Sources.aspx?ID=1")
     # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
-    #  soup.norm_dfs()
+    # soup.norm_dfs()
     # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
-    soup.load_source_items()
+    # soup.load_source_items()
     # soup = SoupKitchen("Traits.aspx?ID=135")
     # soup.parse_item_data(show=True, category="traits")
-    # soup = SoupKitchen("Spells.aspx?ID=140")
-    # soup.parse_item_data(show=True, category="spells")
+    # soup = SoupKitchen("Heritages.aspx?ID=1")
+    # soup.parse_item_data(show=True, category="heritages")
