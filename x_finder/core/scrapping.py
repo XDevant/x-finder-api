@@ -17,16 +17,17 @@ class SourceSoup(SoupKitchen):
     """
 
     def format_df(self):
-        self.df["release_date"] = [SoupKitchen.translate_date(date) for date in df["release_date"]]
-        self.df["errata_date"] = df.apply(
+        self.df["release_date"] = [SoupKitchen.translate_date(date) for date in self.df["release_date"]]
+        self.df["errata_date"] = self.df.apply(
             lambda r: SoupKitchen.translate_date(
                 str(r["latest_errata"]).split(' - ')[-1]
                 ) if r["latest_errata"] else None,
             axis=1)
-        self.df["errata_version"] = df.apply(
+        self.df["errata_version"] = self.df.apply(
             lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",
             axis=1)
-        self.df.rename(columns={'product_page_url': 'paizo_url', 'latest_errata_url': 'errata_url'},
+        self.df.rename(columns={'product_page_url': 'paizo_url', 'latest_errata_url': 'errata_url',
+                                'source_group': 'group'},
                        inplace=True)
         self.df = self.df[["name",
                            "source_group",
@@ -52,14 +53,14 @@ class ItemSoup(SoupKitchen):
 
 
 if __name__ == "__main__":
-    bowl = SourceSoup("Sources.aspx")
-    bowl.cook()
-    # soup = SoupKitchen("Sources.aspx?ID=1")
+    # bowl = SourceSoup("Sources.aspx")
+    # bowl.cook()
+    soup = SoupKitchen("Sources.aspx?ID=1")
     # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
     # soup.norm_dfs()
     # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
-    # soup.load_source_items()
-    # soup = SoupKitchen("Traits.aspx?ID=135")
-    # soup.parse_item_data(show=True, category="traits")
+    soup.load_source_items()
+    # soup = SoupKitchen("Domains.aspx?ID=1")
+    # soup.parse_item_data(show=True, category="domains")
     # soup = SoupKitchen("Heritages.aspx?ID=1")
     # soup.parse_item_data(show=True, category="heritages")

@@ -172,6 +172,7 @@ class SoupKitchen:
 
     def load_source_items(self, update=False, offset=3):
         raw_items = self.raw_soup.find(id="main").find_all('u')
+        item_links = self.extract_source_links(offset)
         base_columns = ["name", "nethys_url"]
         name = self.get_source_name(update)
         category_data, no_category_data = self.parse_source_items(raw_items, offset)
@@ -204,6 +205,11 @@ class SoupKitchen:
                       sep='|',
                       index=False)
         self.list_df = completed_category_dfs
+
+    def extract_source_links(self, offset):
+        item_list = self.raw_soup.find(id="main").find_all('u')
+        link_list = [item.a for item in item_list[offset:] if item.a is not None]
+        return link_list
 
     def get_source_name(self, update=False):
         try:
