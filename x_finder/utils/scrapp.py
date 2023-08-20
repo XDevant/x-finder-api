@@ -1,6 +1,9 @@
-from bs4 import BeautifulSoup
 import requests
 import pandas as pd
+from bs4 import BeautifulSoup
+from os import makedirs
+from time import time, sleep
+from multiprocessing import Pool
 from pathlib import Path
 from x_finder.utils.fixtures.args import item_category_arguments as ica
 
@@ -12,6 +15,17 @@ BASE_URL = "https://2e.aonprd.com/"
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def chrono(func):
+    """Wrapper to print the program runtime."""
+    def wrapper(*args, **kwargs):
+        start = time()
+        result = func(*args, **kwargs)
+        end = time()
+        print(f"Time: {round(end - start, 2)}")
+        return result
+    return wrapper
+
+
 class SoupKitchen:
     base_url = BASE_URL
     nav_links = None
@@ -19,6 +33,8 @@ class SoupKitchen:
     list_df = None
     parsed_rows = None
     dfs = []
+    completed_dfs = {}
+    normed_dfs = {}
 
     def __init__(self,
                  url):
@@ -38,12 +54,14 @@ class SoupKitchen:
             return item_category_arguments["default"][argument]
         return None
 
-    def save(self, prefix="", suffix="", app="utils"):
-        if prefix:
-            prefix += "_"
-        if suffix:
-            suffix = "_" + suffix
-        self.df_to_csv(f"{BASE_DIR}\\{app}\\fixtures\\csv\\{prefix}{self.name}{suffix}_raw.csv", self.df)
+    @staticmethod
+    def save(df, name, directory=None, app="utils"):
+        path = f"{BASE_DIR}\\{app}\\fixtures\\csv\\"
+        if directory:
+            path += f"{directory}\\"
+        makedirs(path, exist_ok=True)
+        df.to_csv(f"{path}\\{name}.csv", sep='|', index=False)
+        print(f"{name} successfully saved at {path}.")
 
     def extract_nav_links(self):
         """ If our table is split among sub-tables, we fetch their urls.
@@ -171,40 +189,33 @@ class SoupKitchen:
         self.df = pd.concat(self.dfs)
 
     def load_source_items(self, update=False, offset=3):
-        raw_items = self.raw_soup.find(id="main").find_all('u')
         item_links = self.extract_source_links(offset)
-        base_columns = ["name", "nethys_url"]
-        name = self.get_source_name(update)
-        category_data, no_category_data = self.parse_source_items(raw_items, offset)
+        source_name = self.get_source_name(update)
+        category_data, no_category_data = self.parse_source_links(item_links)
 
         new_category_dfs = {}
         for key, value in no_category_data.items():
-            df = pd.DataFrame(data=value, columns=base_columns)
+            df = pd.DataFrame.from_records(data=value)
             new_category_dfs[key] = df
-            df.to_csv(f"{BASE_DIR}\\utils\\fixtures\\csv\\{name}\\{key}_items_raw.csv",
-                      sep='|',
-                      index=False)
+            self.save(df, f"{key}_raw", directory=source_name)
 
-        completed_category = self.complete_all_category_items(category_data, base_columns)
+        completed_category = self.complete_all_category_items(category_data)
         completed_category_dfs = {}
+        normed_category_dfs = {}
         for key in completed_category.keys():
-            text_cols = [self.format_column_name(n) for n in self.get("text_columns", key)]
-            url_cols = [self.format_column_name(n, url=True) for n in self.get("url_columns", key)]
-            columns = base_columns + text_cols + url_cols
-            if len(columns) < len(completed_category[key][0]):
-                columns += ["pickup", "heightened"]
-            df = pd.DataFrame(data=completed_category[key], columns=columns)
+            app = self.get("app", key)
+            df = pd.DataFrame(data=completed_category[key])
             try:
                 df = self.norm_df(df, key)
+                normed_category_dfs[key] = df
+                suffix = "normed"
             except Exception:
-                print("An error occurred while norming dfs")
-                pass
-            app = self.get("app", key)
-            completed_category_dfs[key] = df
-            df.to_csv(f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}\\{key}_items_raw.csv",
-                      sep='|',
-                      index=False)
-        self.list_df = completed_category_dfs
+                print(f"An error occurred while norming {key} df")
+                completed_category_dfs[key] = df
+                suffix = "completed"
+            self.save(df, f"{key}_{suffix}", directory=source_name, app=app)
+        self.completed_dfs = completed_category_dfs
+        self.normed_dfs = completed_category_dfs
 
     def extract_source_links(self, offset):
         item_list = self.raw_soup.find(id="main").find_all('u')
@@ -221,19 +232,19 @@ class SoupKitchen:
             name += "_update"
         return name
 
-    def complete_all_category_items(self, category_dict, base_columns):
+    def complete_all_category_items(self, category_dict):
         result_dict = {}
         for key, value in category_dict.items():
-            data = self.complete_category_items(key, value, base_columns)
-            result_dict[key] = data
+            result_dict[key] = self.complete_category_items(key, value)
         return result_dict
 
-    def complete_category_items(self, category, data, base_columns):
+    @chrono
+    def complete_category_items(self, category, data):
         """"""
         result_data = []
         for row in data:
             try:
-                item_bowl = SoupKitchen(row[1])
+                item_bowl = SoupKitchen(row["url"])
             except requests.exceptions.ConnectTimeout:
                 print(f"Connection Timeout for {row}")
                 continue
@@ -241,45 +252,48 @@ class SoupKitchen:
             urls = self.get("url_columns", category)
             item_bowl.parse_item_data(category=category, show=True)
             for header in texts:
-                row.append(item_bowl.get_item_data(header))
+                row[self.format_column_name(header)] = item_bowl.get_item_data(header).strp(";")
             for header in urls:
-                row.append(item_bowl.get_item_data(header, url=True))
+                row[self.format_column_name(header, url=True)] = item_bowl.get_item_data(header, url=True)
             pickup = []
-            heighten = []
+            heightened = []
             for key, value in item_bowl.parsed_rows.items():
-                if key not in base_columns + texts + urls:
+                if key not in row.keys():
                     part = f"{key}: {self.clean(value)}"
                     if "Heightened" in key:
-                        heighten.append(part)
+                        heightened.append(part)
                     else:
                         pickup.append(part)
-            row.append("; ".join(pickup))
-            row.append("; ".join(heighten))
+            row["pickup"] = "; ".join(pickup)
+            row["heightened"] = "; ".join(heightened)
             result_data.append(row)
         return result_data
 
     @staticmethod
-    def parse_source_items(item_list, offset):
+    def parse_source_links(item_list):
         category_data = {}
         no_category_data = {}
-        for raw_item in item_list[offset:]:
-            item = raw_item.a
-            if item:
-                item_data = [item.get_text(), item['href']]
-                item_category = item_data[-1].split('.')[0].lower()
-                if not item_category:
-                    item_category = "unknown"
-                    print(item)
-                if item_category not in item_category_arguments.keys():
-                    if item_category not in no_category_data.keys():
-                        no_category_data[item_category] = []
-                    no_category_data[item_category].append(item_data)
-                else:
-                    if item_category not in category_data.keys():
-                        category_data[item_category] = []
-                    category_data[item_category].append(item_data)
+        for item in item_list:
+            name = item.get_text()
+            url = item['href']
+
+            if name:
+                item_dict = {"name": name, "url": url}
             else:
-                print(f"{item} contains no link")
+                continue
+            if url:
+                item_category = url.split('.')[0].lower()
+            else:
+                item_category = "unknown"
+
+            if item_category not in item_category_arguments.keys():
+                if item_category not in no_category_data.keys():
+                    no_category_data[item_category] = []
+                no_category_data[item_category].append(item_dict)
+            else:
+                if item_category not in category_data.keys():
+                    category_data[item_category] = []
+                category_data[item_category].append(item_dict)
         return category_data, no_category_data
 
     @staticmethod
@@ -413,10 +427,6 @@ class SoupKitchen:
         if url and "url" not in header:
             header += "_url"
         return header.lower()
-
-    @staticmethod
-    def df_to_csv(pathfile, df):
-        df.to_csv(pathfile, sep='|', index=False)
 
     @staticmethod
     def load_fixture(app, name, raw=True):
