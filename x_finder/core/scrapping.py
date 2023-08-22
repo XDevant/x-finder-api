@@ -39,11 +39,11 @@ class SourceSoup(SoupKitchen):
                            "paizo_url",
                            "errata_url"]]
 
-    def cook(self):
+    def cook_sources(self):
         self.extract_nav_links()
         self.load_sub_tables()
         self.format_df()
-        self.save("new")
+        self.save(self.df, "sources_normed", app="core")
 
 
 class ItemSoup(SoupKitchen):
@@ -54,13 +54,21 @@ class ItemSoup(SoupKitchen):
 
 if __name__ == "__main__":
     # bowl = SourceSoup("Sources.aspx")
-    # bowl.cook()
-    soup = SoupKitchen("Sources.aspx?ID=1")
+    # bowl.cook_sources()
+    # soup = SoupKitchen("Sources.aspx?ID=1")
     # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
     # soup.norm_dfs()
     # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
-    soup.load_source_items()
-    # soup = SoupKitchen("Domains.aspx?ID=1")
-    # soup.parse_item_data(show=True, category="domains")
-    # soup = SoupKitchen("Heritages.aspx?ID=1")
-    # soup.parse_item_data(show=True, category="heritages")
+    # soup.load_source_items()
+    soup = SoupKitchen("Domains.aspx?ID=1")
+    soup.parse_item(debug=True, category="domains")
+    soup = SoupKitchen("Deities.aspx?ID=1")
+    soup.parse_item(debug=True, category="deities")
+    soup = SoupKitchen("Heritages.aspx?ID=1")
+    soup.parse_item(debug=True, category="heritages")
+    soup = SoupKitchen("Spells.aspx?ID=1")
+    soup.parse_item(debug=True, category="spells")
+    soup = SoupKitchen("Weapons.aspx?ID=1")
+    soup.parse_item(debug=True, category="weapons")
+    soup = SoupKitchen("Traits.aspx?ID=1")
+    soup.parse_item(debug=True, category="traits")

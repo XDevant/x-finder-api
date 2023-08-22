@@ -29,77 +29,25 @@ def chrono(func):
 class SoupKitchen:
     base_url = BASE_URL
     nav_links = None
-    parsed_rows = None
     df = None
-    item_links = None
+    list_df = None
+    parsed_rows = None
     dfs = []
     completed_dfs = {}
     normed_dfs = {}
 
-    def __init__(self, url=None, name=None, content=None, parser='html.parser'):
-        if url and isinstance(url, str):
-            self.url = url
-        if name:
-            self.name = name
-        elif self.url:
-            self.name = url.split('.')[0]
-        else:
-            self.name = "unknown"
-        if content:
-            self.content = content
-        else:
-            self.content = self.request_content(url)
-        self.parser = parser
-        if self.content:
-            self.soup = BeautifulSoup(self.content, parser)
-        else:
-            self.soup = None
+    def __init__(self,
+                 url):
+        self.content = requests.get(self.base_url + url).content
+        self.raw_soup = BeautifulSoup(self.content, 'html.parser')
+        self.raw_soup.prettify()
+        self.name = url.split('.')[0]
 
     def __str__(self):
-        return str(self.soup)
-
-    def request_content(self, url):
-        if url:
-            response = requests.get(self.base_url + url)
-            if response.status_code == 200:
-                return response.content
-            print(f"Received status code {response.status_code} for url {url}")
-        print("No url provided.")
-        return None
-
-    def cook(self, url=None, name=None, content=None, parser='html.parser'):
-        self.parser = parser
-        if content:
-            self.content = content
-            raw_soup = BeautifulSoup(self.content, parser)
-            self.soup = raw_soup
-            if url:
-                self.url = url
-            if name:
-                self.name = name
-            elif url:
-                self.name = url.split('.')[0]
-            else:
-                self.name = "unknown"
-            return
-        if url:
-            content = self.request_content(url)
-            self.content = content
-            if name:
-                self.name = name
-            else:
-                self.name = url.split('.')[0]
-            raw_soup = BeautifulSoup(content, parser)
-            self.soup = raw_soup
-            return
-        if name:
-            self.name = name
-            return
+        return self.raw_soup
 
     @staticmethod
     def get(argument, category="default"):
-        if not argument and category in item_category_arguments.keys():
-            return category
         if category in item_category_arguments.keys() and argument in item_category_arguments[category].keys():
             return item_category_arguments[category][argument]
         if argument in item_category_arguments["default"].keys():
@@ -115,37 +63,21 @@ class SoupKitchen:
         df.to_csv(f"{path}\\{name}.csv", sep='|', index=False)
         print(f"{name} successfully saved at {path}.")
 
-    def load(self, name, app="utils", directory=None, suffix="raw"):
-        if directory:
-            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{directory}\\{name}_{suffix}.csv"
-        else:
-            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}{suffix}.csv"
-        df = pd.read_csv(pathfile, delimiter="|")
-        return df
-
     def extract_nav_links(self):
         """ If our table is split among sub-tables, we fetch their urls.
         We store their names / urls as key / value pairs in a dict """
-        if self.soup:
-            main = self.soup.find(id="main").span
-            nav_links = main.find_all('a')
-            self.nav_links = {link.get_text(): link['href'] for link in nav_links}
-            self.clean_nav_links()
-            print(f"{len(self.nav_links)} navigation links extracted.")
-        else:
-            print("No soup found, did you cook it?")
+        main = self.raw_soup.find(id="main").span
+        nav_links = main.find_all('a')
+        self.nav_links = {link.get_text(): link['href'] for link in nav_links}
+        self.clean_nav_links()
 
     def clean_nav_links(self):
         """Overload in child if needed"""
         print(self.nav_links)
 
-    def load_table(self, category="default", save=True):
-        if not self.soup:
-            print("No soup found, did you cook it?")
-            return
-        table_rows, headers = self.find_table(self.soup)
+    def load_table(self, category="default"):
+        table_rows, headers = self.find_table(self.raw_soup)
         if not table_rows or not headers:
-            print("No table found.")
             return
 
         item_url_col = self.get("item_url_column", category)
@@ -183,9 +115,7 @@ class SoupKitchen:
             else:
                 row += [None] * len(text_cols + url_cols)
         self.df = pd.DataFrame(data=table_rows, columns=headers)
-        print(f"Table {category} extracted with {counter} missing item url{'s' if counter > 1 else ''}.")
-        if save:
-            self.save(self.df, f"{category}_sources_completed", app="core")
+        print(f"Table extracted with {counter} missing item url{'s' if counter > 1 else ''}.")
 
     def find_table(self, soup):
         table = soup.find(id="main").find('table')
@@ -253,36 +183,22 @@ class SoupKitchen:
         then contact all in one df"""
         for key, url in self.nav_links.items():
             sub_bowl = SoupKitchen(url)
-            sub_bowl.load_table(category=category, save=False)
+            sub_bowl.load_table(category=category)
             sub_bowl.df["category"] = [key] * len(sub_bowl.df)
             self.dfs.append(sub_bowl.df)
         self.df = pd.concat(self.dfs)
-        self.save(self.df, "sources_completed", app="core")
 
-    def load_source_items(self, update=False, offset=3, from_df=None, source_name="unknown", category="default"):
-        """ The base use is to extract a list of links and then extract data from those links.
-        Links encountered will be sorted into different category according to the url found and stored into a dict
-        :param update: Bool used as a suffix for filename of csv, used by the commands when loading into db
-        :param offset: Int used to filter the first source_links only in extract_source_links
-        :param from_df: Panda df used to complete a single item category previously saved, bypass extract_source_links
-        :param source_name: String used with from_df, name of the subdirectory where completed df will be saved
-        :param category: String base name of the file if from_df is not none
-        :return: nothing
+    def load_source_items(self, update=False, offset=3):
+        item_links = self.extract_source_links(offset)
+        source_name = self.get_source_name(update)
+        category_data, no_category_data = self.parse_source_links(item_links)
 
-        """
-        if not from_df:
-            item_links = self.extract_source_links(offset)
-            if source_name == "unknown":
-                source_name = self.get_source_name(update)
-            category_data, no_category_data = self.parse_source_links(item_links)
+        new_category_dfs = {}
+        for key, value in no_category_data.items():
+            df = pd.DataFrame.from_records(data=value)
+            new_category_dfs[key] = df
+            self.save(df, f"{key}_raw", directory=source_name)
 
-            new_category_dfs = {}
-            for key, value in no_category_data.items():
-                df = pd.DataFrame.from_records(data=value)
-                new_category_dfs[key] = df
-                self.save(df, f"{key}_raw", directory=source_name)
-        else:
-            category_data = {category: from_df.to_dict('records')}
         completed_category = self.complete_all_category_items(category_data)
         completed_category_dfs = {}
         normed_category_dfs = {}
@@ -302,24 +218,19 @@ class SoupKitchen:
         self.normed_dfs = completed_category_dfs
 
     def extract_source_links(self, offset):
-        if self.soup:
-            item_list = self.soup.find(id="main").find_all('u')
-            link_list = [item.a for item in item_list[offset:] if item.a is not None]
-            return link_list
-        print("No soup found, did you cook it?")
-        return []
+        item_list = self.raw_soup.find(id="main").find_all('u')
+        link_list = [item.a for item in item_list[offset:] if item.a is not None]
+        return link_list
 
     def get_source_name(self, update=False):
-        if self.soup:
-            try:
-                name = self.soup.find(id="main").find(class_="title").a.get_text()
-            except TypeError:
-                name = "Unknown"
-            if update:
-                name += "_update"
-            return name
-        print("No soup found, did you cook it?")
-        return ""
+        try:
+            name = self.raw_soup.find(id="main").find(class_="title").a.get_text()
+        except TypeError:
+            name = "Unknown"
+
+        if update:
+            name += "_update"
+        return name
 
     def complete_all_category_items(self, category_dict):
         result_dict = {}
@@ -347,13 +258,9 @@ class SoupKitchen:
             pickup = []
             heightened = []
             for key, value in item_bowl.parsed_rows.items():
-                if key in urls:
-                    formatted_key = self.format_column_name(key)
-                else:
-                    formatted_key = self.format_column_name(key)
-                if formatted_key not in row.keys():
-                    part = f"{formatted_key}: {self.clean(value)}"
-                    if "heightened" in formatted_key:
+                if key not in row.keys():
+                    part = f"{key}: {self.clean(value)}"
+                    if "Heightened" in key:
                         heightened.append(part)
                     else:
                         pickup.append(part)
@@ -418,140 +325,10 @@ class SoupKitchen:
             df["source"] = df.apply(lambda r: r["source"].split('pg. ')[0].strip(), axis=1)
         return df
 
-    def parse_item(self, debug=False, category="default"):
-        main = self.soup.find(id="main")
-        started = False
-        ended = 0
-        last_key = ""
-        loaded_values = []
-        parsed = []
-        titles = [{}]
-        links = []
-        tails = []
-        title = main.find_all('span')[-1].h1
-        if title is not None and title.a is not None and title.a['href'] is not None:
-            main = main.find_all('span')[-1]
-
-        for child in main:
-            if not child.name and child.get_text() in [' ', '\n', '']:
-                continue
-            if not started:
-                if child.name == 'h1':
-                    child = child.a
-                if child.name == "a":
-                    if child['href'] and child.get_text():
-                        titles[0]["name"] = child.get_text()
-                        titles[0]["url"] = child['href']
-                        title_model = child['href'].split('.')[0].strip().lower().replace(' ', '_')
-                        if title_model == category:
-                            titles[0]['x_finder_model'] = title_model
-                            started = True
-                            if debug:
-                                print(f"Parsing started on {child}")
-                elif category == "spells" and child.name is None and len(child.get_text()) > 1:
-                    titles[0]["name"] = child.get_text()
-                    titles[0]["url"] = self.url
-                    titles[0]['x_finder_model'] = "spells"
-                    started = True
-                    if debug:
-                        print(f"Parsing started on {child}")
-                continue
-
-            if loaded_values:
-                if child.name in ['b', 'br', 'hr', 'h2', 'h3']:
-                    self.store(last_key, loaded_values, ended, titles, parsed)
-                    last_key = ""
-                    loaded_values = []
-                else:
-                    value = child.get_text().strip(',; ')
-                    if value:
-                        loaded_values.append(value)
-                    continue
-
-            if child.name in ["h2", "h3"]:
-                ended += 1
-                titles.append({})
-                name = child.get_text().strip(',; ')
-                titles[ended]["name"] = name
-                name_model = self.get("", name.lower().replace(' ', '_'))
-                link = child.find('a')
-                if link:
-                    titles[ended]["url"] = link['href']
-                    if link['href']:
-                        url_model = link['href'].split('.')[0].strip().lower().replace(' ', '_')
-                        if url_model:
-                            titles[ended]["x_finder_model"] = self.get("", url_model)
-                        if (not url_model or url_model == "rules") and name_model != "default":
-                            titles[ended]["x_finder_model"] = name_model
-                continue
-            if child.name == 'b':
-                value = child.get_text().strip(' ,;')
-                value = "_".join(value.split(" "))
-                if value:
-                    last_key = value.lower()
-                continue
-
-            if last_key:
-                value = child.get_text().strip(';, ')
-                if value:
-                    if value == '(disease)':
-                        ended += 1
-                        titles.append({})
-                        titles[ended]["name"] = last_key
-                        titles[ended]["x_finder_model"] = 'diseases'
-                        last_key = ""
-                        continue
-                    loaded_values.append(value)
-                    continue
-
-            if child.name == 'a':
-                links.append(child['href'])
-            if child.name == 'span':
-                if titles[0]["x_finder_model"] == 'spells' and 'spell_level' not in titles[0].keys():
-
-                    titles[0]['spell_level'] = child.get_text().split(' ')[-1]
-                    titles[0]['spell_type'] = child.get_text().split(' ')[0]
-                    continue
-                link = child.find('a')
-                if link and link['href'] and link.get_text():
-                    if "Traits" in link['href']:
-                        if "traits" not in titles[0].keys():
-                            titles[ended]['traits'] = []
-                        titles[ended]['traits'].append(link.get_text())
-                    links.append({link.get_text(): link['href']})
-                    continue
-
-            if child.name is None or child.name in ['a', 'u']:
-                value = child.get_text().strip(' ,;')
-                if value:
-                    if "description" not in titles[ended].keys():
-                        titles[ended]["description"] = []
-                    titles[ended]["description"].append(value)
-                continue
-            if child.name in ['br', 'hr']:
-                continue
-            value = child.get_text().strip()
-            if value:
-                tails.append(value)
-        for title in titles:
-            print(title)
-        print(parsed, '\n', tails)
-
-    def store(self, key, value, index, found, not_found):
-        if 'x_finder_model' in found[0].keys() and key not in found[0].keys():
-            category = found[0]['x_finder_model']
-            text_cols = self.get("text_columns", category)
-            if key in text_cols:
-                found[0][key] = value
-                return
-        if key not in found[index].keys() and 'x_finder_model' in found[index].keys():
-            if found[index]['x_finder_model']:
-                category = found[index]['x_finder_model']
-                text_cols = self.get("text_columns", category)
-                if key in text_cols:
-                    found[index][key] = value
-                    return
-        not_found.append({key: value})
+    def norm_dfs(self):
+        for key in self.list_df.keys():
+            df = self.list_df[key]
+            self.norm_df(df, key)
 
     def parse_item_data(self, show=False, category="default"):
         """Once our table or list of items is loaded, we often need to
@@ -559,9 +336,8 @@ class SoupKitchen:
         thanks to the markup provided to the constructor."""
         args = ["start", "end", "row_separator", "cell_separator", "tail_start", "row_sep_bis", "traits"]
         start, end, row, cell, tail, row2, traits = (self.get(arg, category) for arg in args)
-        raw_data = self.soup.find(id="main")
-        for child in raw_data:
-            print(child.name, child)
+        raw_data = self.raw_soup.find(id="main")
+        # for child in raw_data.children:
         try:
             data = str(raw_data).split(start)[1].split(end)[0]
         except IndexError:
@@ -576,15 +352,14 @@ class SoupKitchen:
         if show:
             print(rows)
         other = ""
-        if end == "<h1984>":
+        if end == "<h1984":
             new_rows = []
             for row in rows:
                 new_row = row.replace("<hr>", "<hr/>")
-                new_row = new_row.replace("<br>", "<br/>")
-                if tail not in new_row or other:
+                if "<hr/>" not in new_row or other:
                     new_rows.append(row)
                 else:
-                    sliced_row = new_row.split(tail)
+                    sliced_row = new_row.split("<hr/>")
                     new_rows.append(sliced_row[0])
                     other += " ".join(sliced_row[1:])
             rows = new_rows
@@ -592,19 +367,12 @@ class SoupKitchen:
             last = rows[-1].split(tail)
             rows = rows[:-1] + last[:1]
             other = " ".join(last[1:])
-        parsed_rows = {self.extract_value(row.split(cell)[0]): row.split(cell)[1] for row in rows if cell in row}
+        parsed_rows = {row.split(cell)[0]: row.split(cell)[1] for row in rows if cell in row}
         parsed_rows["Other"] = other
         if traits:
             parsed_rows["Traits"] = self.find_traits(raw_data)
         if category in ["spells", "feats", "equipment", "weapons", "armor", "shield"]:
             parsed_rows["Spell Level"] = self.find_level(raw_data)
-        if category == "deities":
-            if "Pantheons" in parsed_rows.keys() and parsed_rows["Pantheons"] is not None:
-                parsed_rows["Pantheons"] = parsed_rows["Pantheons"].split('<h2')[0]
-            if "Cleric Spells" in parsed_rows.keys() and parsed_rows["Cleric Spells"] is not None:
-                split_row = parsed_rows["Cleric Spells"].split('<h2')
-                parsed_rows["Cleric Spells"] = split_row[0]
-                parsed_rows["Divine Intercession"] = split_row[-1].split('</h2>')[-1]
         self.parsed_rows = parsed_rows
         if show:
             print(self.parsed_rows)
@@ -641,7 +409,7 @@ class SoupKitchen:
         Return String
         """
         if self.parsed_rows and header and header in self.parsed_rows.keys():
-            value = BeautifulSoup(self.parsed_rows[header], self.parser)
+            value = BeautifulSoup(self.parsed_rows[header], 'html.parser')
             if value:
                 if url:
                     try:
@@ -651,19 +419,6 @@ class SoupKitchen:
                         return ""
                 text = value.get_text()
                 return text.strip()
-        return ""
-
-    def extract_value(self, value, url=False):
-        if value:
-            value = BeautifulSoup(value, self.parser)
-            if url:
-                try:
-                    url = value.find('a')['href']
-                    return url
-                except TypeError:
-                    return ""
-            text = value.get_text()
-            return text.strip()
         return ""
 
     @staticmethod
