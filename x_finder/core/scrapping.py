@@ -56,11 +56,9 @@ if __name__ == "__main__":
     # bowl = SourceSoup("Sources.aspx")
     # bowl.cook_sources()
     # soup = SoupKitchen("Sources.aspx?ID=1")
-    # soup.list_df = {"traits": soup.load_fixture(app="core", name="Core Rulebook\\traits_items")}
-    # soup.norm_dfs()
-    # soup.list_df["traits"].to_csv(f"{BASE_DIR}\\core\\fixtures\\csv\\Core Rulebook\\traits_items_raw.csv", sep='|', index=False)
-    # soup.load_source_items()
-    for i in range(2, 4):
+    # soup.load_source_items(debug=True)
+    for i in range(170, 182):
+        """
         soup = SoupKitchen(f"Domains.aspx?ID={i}")
         soup.parse_item(debug=True, category="domains")
         soup = SoupKitchen(f"Deities.aspx?ID={i}")
@@ -75,4 +73,8 @@ if __name__ == "__main__":
         soup.parse_item(debug=True, category="traits")
         soup = SoupKitchen(f"Ancestries.aspx?ID={i}")
         soup.parse_item(debug=True, category="ancestries")
-
+        """
+        # soup = SoupKitchen(f"Feats.aspx?ID={i}")
+        # soup.parse_item(debug=True, category="feats")
+        soup = SoupKitchen(f"Equipment.aspx?ID={i}")
+        soup.parse_item(debug=True, category="equipment")
