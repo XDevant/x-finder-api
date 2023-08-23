@@ -418,140 +418,191 @@ class SoupKitchen:
             df["source"] = df.apply(lambda r: r["source"].split('pg. ')[0].strip(), axis=1)
         return df
 
+    @staticmethod
+    def find_start_type(bs4_item, category):
+        boxes = bs4_item.find_all('span')
+        if boxes:
+            title = boxes[-1].h1
+            if title is not None and title.a is not None and title.a['href'] is not None:
+                return "ok"
+        if category == "spells":
+            return "broken_link"
+        return "broken_title"
+
+    @staticmethod
+    def check_start(child, status):
+        if not child.get_text():
+            return False
+        if status.type == "broken_link" and child.name is None and len(child.get_text()) > 1:
+            return True
+        if child.name == "a" and child['href']:
+            return True
+        return False
+
+    def add_new_title(self, child, result, status, category=None, name=None):
+        if status.started:
+            status.ended += 1
+        status.started = True
+        result.titles.append({})
+        if name is None:
+            name = child.get_text()
+        if name:
+            name.strip(',; ')
+        result.titles[status.ended]["name"] = name
+        if child.name == 'a' and child['href']:
+            url = child['href']
+        elif child.name and child.find('a'):
+            url = child.find('a')['href']
+        elif status.ended == 0:
+            url = self.url
+        else:
+            url = ""
+        result.titles[status.ended]["url"] = url
+        if category is None:
+            category = self.find_nested_item_category(name, url)
+        if category:
+            result.titles[status.ended]['x_finder_model'] = category
+
+    def find_nested_item_category(self, name, url):
+        name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
+        name_model = self.get("", name)
+        url_base = url.split('.')[0].strip().lower().replace(' ', '_').replace('-', '_')
+        url_model = self.get("", url_base)
+        if url_model and url_model not in ["rules", "default"]:
+            return url_model
+        if name_model != "default":
+            return name_model
+        return "default"
+
     def parse_item(self, debug=False, category="default"):
         main = self.soup.find(id="main")
-        started = False
-        ended = 0
-        last_key = ""
-        loaded_values = []
-        parsed = []
-        titles = [{}]
-        links = []
-        tails = []
-        title = main.find_all('span')[-1].h1
-        if title is not None and title.a is not None and title.a['href'] is not None:
+
+        class Status:
+            type = "broken_title"
+            started = False
+            ended = 0
+            last_key = ""
+            loaded_values = []
+
+        class Result:
+            parsed = []
+            titles = []
+            links = []
+            tails = []
+
+        status = Status()
+        result = Result()
+        status.type = self.find_start_type(main, category)
+        if status.type == "ok":
             main = main.find_all('span')[-1]
 
         for child in main:
             if not child.name and child.get_text() in [' ', '\n', '']:
                 continue
-            if not started:
+            if not status.started:
                 if child.name == 'h1':
                     child = child.a
-                if child.name == "a":
-                    if child['href'] and child.get_text():
-                        titles[0]["name"] = child.get_text()
-                        titles[0]["url"] = child['href']
-                        title_model = child['href'].split('.')[0].strip().lower().replace(' ', '_')
-                        if title_model == category:
-                            titles[0]['x_finder_model'] = title_model
-                            started = True
-                            if debug:
-                                print(f"Parsing started on {child}")
-                elif category == "spells" and child.name is None and len(child.get_text()) > 1:
-                    titles[0]["name"] = child.get_text()
-                    titles[0]["url"] = self.url
-                    titles[0]['x_finder_model'] = "spells"
-                    started = True
-                    if debug:
-                        print(f"Parsing started on {child}")
+                start_check = self.check_start(child, status)
+                if start_check:
+                    self.add_new_title(child, result, status, category)
+                if status.started and debug:
+                    print(f"Parsing started on {child}")
                 continue
 
-            if loaded_values:
-                if child.name in ['b', 'br', 'hr', 'h2', 'h3']:
-                    self.store(last_key, loaded_values, ended, titles, parsed)
-                    last_key = ""
-                    loaded_values = []
+            if status.last_key:
+                if child.name and child.name in self.get("cell_ends", category):
+                    self.store(status, result)
+                    status.last_key = ""
+                    status.loaded_values = []
                 else:
                     value = child.get_text().strip(',; ')
                     if value:
-                        loaded_values.append(value)
+                        if value == '(disease)':
+                            self.add_new_title(child,
+                                               result,
+                                               status,
+                                               'diseases',
+                                               name=status.last_key.replace('_', ' ').title())
+                            status.last_key = ""
+                            status.loaded_values = []
+                            continue
+                        status.loaded_values.append(value)
                     continue
 
-            if child.name in ["h2", "h3"]:
-                ended += 1
-                titles.append({})
-                name = child.get_text().strip(',; ')
-                titles[ended]["name"] = name
-                name_model = self.get("", name.lower().replace(' ', '_'))
-                link = child.find('a')
-                if link:
-                    titles[ended]["url"] = link['href']
-                    if link['href']:
-                        url_model = link['href'].split('.')[0].strip().lower().replace(' ', '_')
-                        if url_model:
-                            titles[ended]["x_finder_model"] = self.get("", url_model)
-                        if (not url_model or url_model == "rules") and name_model != "default":
-                            titles[ended]["x_finder_model"] = name_model
-                continue
-            if child.name == 'b':
-                value = child.get_text().strip(' ,;')
-                value = "_".join(value.split(" "))
-                if value:
-                    last_key = value.lower()
+            if child.name and child.name in self.get("next_titles", category):
+                self.add_new_title(child, result, status)
                 continue
 
-            if last_key:
-                value = child.get_text().strip(';, ')
-                if value:
-                    if value == '(disease)':
-                        ended += 1
-                        titles.append({})
-                        titles[ended]["name"] = last_key
-                        titles[ended]["x_finder_model"] = 'diseases'
-                        last_key = ""
-                        continue
-                    loaded_values.append(value)
-                    continue
+            if child.name and child.name in self.get("cell_starts", category):
+                key = child.get_text().strip(' ,;')
+                key = key.replace('-', '_')
+                key = key.replace(' ', '_')
+                if key:
+                    status.last_key = key.lower()
+                    status.loaded_values = []
+                continue
 
             if child.name == 'a':
-                links.append(child['href'])
+                result.links.append({"name": child.get_text(), "url": child['href']})
             if child.name == 'span':
-                if titles[0]["x_finder_model"] == 'spells' and 'spell_level' not in titles[0].keys():
-
-                    titles[0]['spell_level'] = child.get_text().split(' ')[-1]
-                    titles[0]['spell_type'] = child.get_text().split(' ')[0]
+                if result.titles[0]["x_finder_model"] == 'spells' and 'spell_level' not in result.titles[0].keys():
+                    result.titles[0]['spell_level'] = child.get_text().split(' ')[-1]
+                    result.titles[0]['spell_type'] = child.get_text().split(' ')[0]
                     continue
                 link = child.find('a')
                 if link and link['href'] and link.get_text():
                     if "Traits" in link['href']:
-                        if "traits" not in titles[0].keys():
-                            titles[ended]['traits'] = []
-                        titles[ended]['traits'].append(link.get_text())
-                    links.append({link.get_text(): link['href']})
+                        if "traits" not in result.titles[0].keys():
+                            result.titles[status.ended]['traits'] = []
+                        result.titles[status.ended]['traits'].append(link.get_text())
+                    else:
+                        result.links.append({"name": link.get_text(), "url": link['href']})
                     continue
 
-            if child.name is None or child.name in ['a', 'u']:
+            if child.name is None or child.name in ['a', 'u', 'i']:
                 value = child.get_text().strip(' ,;')
                 if value:
-                    if "description" not in titles[ended].keys():
-                        titles[ended]["description"] = []
-                    titles[ended]["description"].append(value)
+                    if "description" not in result.titles[status.ended].keys():
+                        result.titles[status.ended]["description"] = []
+                    result.titles[status.ended]["description"].append(value)
                 continue
             if child.name in ['br', 'hr']:
                 continue
             value = child.get_text().strip()
             if value:
-                tails.append(value)
-        for title in titles:
+                result.tails.append(value)
+        if status.last_key and status.loaded_values:
+            self.store(status, result)
+        for title in result.titles:
             print(title)
-        print(parsed, '\n', tails)
+        print(result.parsed, '\n', result.tails)
 
-    def store(self, key, value, index, found, not_found):
-        if 'x_finder_model' in found[0].keys() and key not in found[0].keys():
-            category = found[0]['x_finder_model']
+    def store(self, status, result):
+        match = False
+        if 'x_finder_model' in result.titles[0].keys():
+            category = result.titles[0]['x_finder_model']
             text_cols = self.get("text_columns", category)
-            if key in text_cols:
-                found[0][key] = value
-                return
-        if key not in found[index].keys() and 'x_finder_model' in found[index].keys():
-            if found[index]['x_finder_model']:
-                category = found[index]['x_finder_model']
-                text_cols = self.get("text_columns", category)
-                if key in text_cols:
-                    found[index][key] = value
+            if status.last_key in text_cols:
+                match = True
+                if status.last_key not in result.titles[0].keys():
+                    result.titles[0][status.last_key] = status.loaded_values
                     return
-        not_found.append({key: value})
+        if 'x_finder_model' in result.titles[status.ended].keys():
+            if result.titles[status.ended]['x_finder_model']:
+                category = result.titles[status.ended]['x_finder_model']
+                text_cols = self.get("text_columns", category)
+                if status.last_key in text_cols:
+                    if status.last_key not in result.titles[status.ended].keys():
+                        result.titles[status.ended][status.last_key] = status.loaded_values
+                        return
+        if match and status.last_key == 'advanced_domain_spell':
+            if 'advanced_apocryphal_domain_spell' not in result.titles[0].keys():
+                result.titles[0]['advanced_apocryphal_domain_spell'] = status.loaded_values
+                return
+        if match and status.last_key not in result.titles[status.ended].keys():
+            result.titles[status.ended][status.last_key] = status.loaded_values
+            return
+        result.parsed.append({status.last_key: status.loaded_values})
 
     def parse_item_data(self, show=False, category="default"):
         """Once our table or list of items is loaded, we often need to
