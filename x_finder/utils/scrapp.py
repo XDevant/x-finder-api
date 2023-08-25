@@ -29,7 +29,9 @@ def chrono(func):
 class SoupKitchen:
     base_url = BASE_URL
     nav_links = None
+    parsed_row = None
     parsed_rows = None
+    nested_rows = None
     df = None
     item_links = None
     dfs = []
@@ -273,6 +275,7 @@ class SoupKitchen:
         :param from_df: Panda df used to complete a single item category previously saved, bypass extract_source_links
         :param source_name: String used with from_df, name of the subdirectory where completed df will be saved
         :param category: String base name of the file if from_df is not none
+        :param debug: Bool
         :return: nothing
         """
         if not from_df:
@@ -288,12 +291,12 @@ class SoupKitchen:
                 self.save(df, f"{key}_raw", directory=source_name)
         else:
             category_data = {category: from_df.to_dict('records')}
-        completed_category = self.complete_all_category_items(category_data, debug)
+        completed_categories, nested_categories = self.complete_all_category_items(category_data, debug=debug)
         completed_category_dfs = {}
         normed_category_dfs = {}
-        for key in completed_category.keys():
+        for key in completed_categories.keys():
             app = self.get("app", key)
-            df = pd.DataFrame(data=completed_category[key])
+            df = pd.DataFrame.from_records(data=completed_categories[key])
             try:
                 df = self.norm_df(df, key)
                 normed_category_dfs[key] = df
@@ -328,14 +331,17 @@ class SoupKitchen:
 
     def complete_all_category_items(self, category_dict, debug=False):
         result_dict = {}
+        nested_dict = {}
         for key, value in category_dict.items():
-            result_dict[key] = self.complete_category_items(key, value, debug)
-        return result_dict
+            if key in ["spells", "equipment"]:
+                result_dict[key], nested_dict[key] = self.complete_category_items(key, value, debug=debug)
+        return result_dict, nested_dict
 
     @chrono
-    def complete_category_items(self, category, data, limit=10, debug=False):
+    def complete_category_items(self, category, data, limit=30, debug=False):
         """"""
         results = []
+        nesteds = []
         count = 0
         for row in data:
             try:
@@ -346,16 +352,20 @@ class SoupKitchen:
             item_bowl.parse_item(category=category, debug=True)
 
             result = item_bowl.parsed_rows
-            results.append(result)
+            nested = item_bowl.nested_rows
+            results += result
+            nesteds += nested
             count += 1
-            if debug and count >= limit:
+            if debug and count == limit:
                 break
-        return results
+        print(len(results))
+        return results, nesteds
 
     @staticmethod
     def parse_source_links(item_list):
         category_data = {}
         no_category_data = {}
+        flags = []
         for item in item_list:
             name = item.get_text()
             url = item['href']
@@ -376,6 +386,9 @@ class SoupKitchen:
             else:
                 if item_category not in category_data.keys():
                     category_data[item_category] = []
+                if item_category == "equipment" and item_dict["url"] in flags:
+                    continue
+                flags.append(item_dict["url"])
                 category_data[item_category].append(item_dict)
         return category_data, no_category_data
 
@@ -392,20 +405,23 @@ class SoupKitchen:
                 lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
                 axis=1)
             df["name"] = df.apply(lambda r: r["name"].split('(')[0].strip(), axis=1)
-        if "spell_level" in df.columns:
-            df["spell_type"] = df.apply(
-                lambda r: r["spell_level"].split(' ')[0].strip(),
-                axis=1)
-            df["spell_level"] = df.apply(
-                lambda r: int(r["spell_level"].split(' ')[-1].strip()),
+        if "level" in df.columns:
+            if "spell_type" in self.get("text_columns", key):
+                df["spell_type"] = df.apply(
+                    lambda r: r["level"].split(' ')[0].strip(),
+                    axis=1)
+            df["level"] = df.apply(
+                lambda r: int(r["level"].split(' ')[-1].strip()) if r["level"].split(' ')[-1].strip().isnumeric() else -1,
                 axis=1)
         if "description" not in df.columns and "other" in df.columns:
             df.rename(columns={"other": "description"}, inplace=True)
         if "source" in df.columns and "source_page" not in df.columns:
+            df.rename(columns={"source": "sources"}, inplace=True)
             df["source_page"] = df.apply(
-                lambda r: int(r["source"].split('pg. ')[-1].split(' ')[0].strip()) if 'pg. ' in r["source"] else 0,
+                lambda r: int(r["sources"][-2].split('pg. ')[-1]) if 'pg. ' in r["sources"][-2] else 0,
                 axis=1)
-            df["source"] = df.apply(lambda r: r["source"].split('pg. ')[0].strip(), axis=1)
+            df["source"] = df.apply(lambda r: r["sources"][-2].split('pg. ')[0].strip(), axis=1)
+            df["source_update"] = df.apply(lambda r: r["sources"][-1].strip(), axis=1)
         return df
 
     @staticmethod
@@ -444,12 +460,14 @@ class SoupKitchen:
         if name.endswith('+'):
             status.family = True
         result.titles[status.ended]["name"] = name
-        if child.name == 'a' and child['href']:
+        if child.name == 'a' and child['href'] and child['href'] not in [None, "PFS.aspx"]:
             url = child['href']
-        elif child.name and child.find('a'):
+        elif child.name and child.find('a') and child.find('a')['href'] not in [None, "PFS.aspx"]:
             url = child.find('a')['href']
         elif status.ended == 0:
             url = self.url
+        elif status.family:
+            url = result.titles[0]["url"]
         else:
             url = ""
         result.titles[status.ended]["url"] = url
@@ -459,7 +477,8 @@ class SoupKitchen:
             result.titles[status.ended]['x_finder_model'] = category
         if "level" in self.get("text_columns", category):
             if name.split(' ')[-1].isnumeric() or name.split(' ')[-1].endswith('+'):
-                result.titles[status.ended]['level'] = name.split(' ')[-1]
+                result.titles[status.ended]['level'] = name.split(',')[-1]
+                result.titles[status.ended]['name'] = name.split(',')[0]
 
     def find_nested_item_category(self, name, url):
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
@@ -472,8 +491,12 @@ class SoupKitchen:
             return name_model
         return "default"
 
-    def parse_item(self, debug=False, category="default"):
-        main = self.soup.find(id="main")
+    def parse_item(self, category="default", debug=False, verbose=False):
+        if self.soup:
+            main = self.soup.find(id="main")
+        else:
+            print(f"No soup provided for {self.name}: {category}, {self.url}.")
+            return
 
         class Status:
             type = "broken_title"
@@ -492,7 +515,8 @@ class SoupKitchen:
         status = Status()
         result = Result()
         status.type = self.find_start_type(main, category)
-        print(status.type)
+        if verbose:
+            print(status.type)
         if status.type.startswith("ok"):
             soup = main.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
             self.read_soup(soup, status, result, category, debug)
@@ -501,19 +525,37 @@ class SoupKitchen:
             status.started = False
             self.read_soup(main, status, result, category, debug)
 
-    def read_soup(self, soup, status, result, category, debug=False):
+        self.parsed_rows = []
+        self.nested_rows = []
+        for title in result.titles:
+            if title and len(title) > 2 and 'x_finder_model' in title.keys():
+                if title['x_finder_model'] == category:
+                    self.parsed_rows.append(title)
+                else:
+                    self.nested_rows.append(title)
+        if verbose:
+            for title in result.titles:
+                if title and len(title) > 2 and 'x_finder_model' in title.keys():
+                    print(title)
+            if result.parsed:
+                print(result.parsed)
+            if result.tails:
+                print(result.tails)
+
+    def read_soup(self, soup, status, result, category, debug=False, verbose=False):
         for child in soup:
             if not child.name and child.get_text() in [' ', '\n', '']:
                 continue
             if not status.started:
                 if child.name == 'h1' and child.get_text():
-                    print(child)
                     self.add_new_title(child, result, status, category)
+                    if status.started and verbose:
+                        print(f"Parsing started on {child}")
                     continue
                 start_check = self.check_start(child, status)
                 if start_check:
                     self.add_new_title(child, result, status, category)
-                if status.started and debug:
+                if status.started and verbose:
                     print(f"Parsing started on {child}")
                 continue
 
@@ -559,7 +601,7 @@ class SoupKitchen:
                 if "broken" in status.type and 'level' not in result.titles[status.ended].keys():
                     text = child.get_text().strip(' ,;')
                     if "action" in text:
-                        result.titles[status.ended]['name'] += child.get_text().strip(' ,;')
+                        result.titles[status.ended]['action'] = child.get_text().strip(' ,;')
                         continue
                     if 'level' in self.get("text_columns", category):
                         result.titles[status.ended]['level'] = child.get_text().strip(' ,;')
@@ -589,12 +631,11 @@ class SoupKitchen:
                 continue
             value = child.get_text().strip()
             if value:
-                result.tails.append(value)
+                if "description" not in result.titles[status.ended].keys():
+                    result.titles[status.ended]["description"] = []
+                result.titles[status.ended]["description"].append(value)
         if status.last_key and status.loaded_values:
             self.store(status, result)
-        for title in result.titles:
-            print(title)
-        print(result.parsed, '\n', result.tails)
 
     def store(self, status, result):
         match = False
@@ -621,6 +662,19 @@ class SoupKitchen:
         if match and status.last_key not in result.titles[status.ended].keys():
             result.titles[status.ended][status.last_key] = status.loaded_values
             return
+        if 'x_finder_model' in result.titles[status.ended].keys():
+            name = result.titles[status.ended]["name"].lower().replace(' ', '-')
+            if name == result.titles[status.ended]['x_finder_model']:
+                result.titles[status.ended]["name"] = status.last_key
+            category = result.titles[status.ended]['x_finder_model']
+            nested_cols = self.get("nested_pairs", category)
+            if nested_cols:
+                nested_number = len(nested_cols) // 2
+                for i in range(nested_number):
+                    if nested_cols[2 * i] not in result.titles[status.ended].keys() and status.loaded_values:
+                        result.titles[status.ended][nested_cols[2 * i]] = status.last_key
+                        result.titles[status.ended][nested_cols[2 * i + 1]] = status.loaded_values
+                        return
         result.parsed.append({status.last_key: status.loaded_values})
 
     def parse_item_data(self, show=False, category="default"):
@@ -662,22 +716,22 @@ class SoupKitchen:
             last = rows[-1].split(tail)
             rows = rows[:-1] + last[:1]
             other = " ".join(last[1:])
-        parsed_rows = {self.extract_value(row.split(cell)[0]): row.split(cell)[1] for row in rows if cell in row}
-        parsed_rows["Other"] = other
+        parsed_row = {self.extract_value(row.split(cell)[0]): row.split(cell)[1] for row in rows if cell in row}
+        parsed_row["Other"] = other
         if traits:
-            parsed_rows["Traits"] = self.find_traits(raw_data)
+            parsed_row["Traits"] = self.find_traits(raw_data)
         if category in ["spells", "feats", "equipment", "weapons", "armor", "shield"]:
-            parsed_rows["Spell Level"] = self.find_level(raw_data)
+            parsed_row["Spell Level"] = self.find_level(raw_data)
         if category == "deities":
-            if "Pantheons" in parsed_rows.keys() and parsed_rows["Pantheons"] is not None:
-                parsed_rows["Pantheons"] = parsed_rows["Pantheons"].split('<h2')[0]
-            if "Cleric Spells" in parsed_rows.keys() and parsed_rows["Cleric Spells"] is not None:
-                split_row = parsed_rows["Cleric Spells"].split('<h2')
-                parsed_rows["Cleric Spells"] = split_row[0]
-                parsed_rows["Divine Intercession"] = split_row[-1].split('</h2>')[-1]
-        self.parsed_rows = parsed_rows
+            if "Pantheons" in parsed_row.keys() and parsed_row["Pantheons"] is not None:
+                parsed_row["Pantheons"] = parsed_row["Pantheons"].split('<h2')[0]
+            if "Cleric Spells" in parsed_row.keys() and parsed_row["Cleric Spells"] is not None:
+                split_row = parsed_row["Cleric Spells"].split('<h2')
+                parsed_row["Cleric Spells"] = split_row[0]
+                parsed_row["Divine Intercession"] = split_row[-1].split('</h2>')[-1]
+        self.parsed_row = parsed_row
         if show:
-            print(self.parsed_rows)
+            print(self.parsed_row)
 
     @staticmethod
     def find_traits(data, separator="!", singles=("traituncommon", "traitrare", "traitunique", ), multiple="trait"):
@@ -710,8 +764,8 @@ class SoupKitchen:
             url     : Bool
         Return String
         """
-        if self.parsed_rows and header and header in self.parsed_rows.keys():
-            value = BeautifulSoup(self.parsed_rows[header], self.parser)
+        if self.parsed_row and header and header in self.parsed_row.keys():
+            value = BeautifulSoup(self.parsed_row[header], self.parser)
             if value:
                 if url:
                     try:
