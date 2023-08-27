@@ -530,6 +530,10 @@ class SoupKitchen:
         for title in result.titles:
             if title and len(title) > 2 and 'x_finder_model' in title.keys():
                 if title['x_finder_model'] == category:
+                    if 'level' in result.titles[0].keys() and 'level' not in title.keys():
+                        continue
+                    if result.titles[0]['name'] == 'Scroll':
+                        print(result.titles)
                     self.parsed_rows.append(title)
                 else:
                     self.nested_rows.append(title)
@@ -537,10 +541,11 @@ class SoupKitchen:
             for title in result.titles:
                 if title and len(title) > 2 and 'x_finder_model' in title.keys():
                     print(title)
+        if debug:
             if result.parsed:
-                print(result.parsed)
+                print(result.titles[0]["name"], result.parsed)
             if result.tails:
-                print(result.tails)
+                print(result.titles[0]["name"], result.tails)
 
     def read_soup(self, soup, status, result, category, debug=False, verbose=False):
         for child in soup:
@@ -604,7 +609,12 @@ class SoupKitchen:
                         result.titles[status.ended]['action'] = child.get_text().strip(' ,;')
                         continue
                     if 'level' in self.get("text_columns", category):
-                        result.titles[status.ended]['level'] = child.get_text().strip(' ,;')
+                        level = child.get_text().strip(' ,;')
+                        result.titles[status.ended]['level'] = level
+                        if level.endswith('+'):
+                            status.family = True
+                            result.titles[status.ended]['x_finder_model'] = category
+                            result.titles[status.ended]['url'] = result.titles[0]["url"]
                         continue
                 link = child.find('a')
                 if link and link['href'] and link.get_text():
@@ -621,7 +631,9 @@ class SoupKitchen:
                     values = child.find_all('li')
                     values = [value.get_text().strip(' ,;') for value in values if value.get_text() is not None]
                 else:
-                    values = [child.get_text().strip(' ,;')]
+                    value = child.get_text().strip(' ,;')
+                    if value:
+                        values = [value]
                 if values:
                     if "description" not in result.titles[status.ended].keys():
                         result.titles[status.ended]["description"] = []
@@ -644,7 +656,7 @@ class SoupKitchen:
             text_cols = self.get("text_columns", category)
             if status.last_key in text_cols or status.last_key.split('_')[0] in text_cols:
                 match = True
-                if status.last_key not in result.titles[0].keys():
+                if status.last_key not in result.titles[0].keys() and not status.family:
                     result.titles[0][status.last_key] = status.loaded_values
                     return
         if 'x_finder_model' in result.titles[status.ended].keys():
@@ -663,7 +675,7 @@ class SoupKitchen:
             result.titles[status.ended][status.last_key] = status.loaded_values
             return
         if 'x_finder_model' in result.titles[status.ended].keys():
-            name = result.titles[status.ended]["name"].lower().replace(' ', '-')
+            name = result.titles[status.ended]["name"].lower().replace(' ', '_')
             if name == result.titles[status.ended]['x_finder_model']:
                 result.titles[status.ended]["name"] = status.last_key
             category = result.titles[status.ended]['x_finder_model']
