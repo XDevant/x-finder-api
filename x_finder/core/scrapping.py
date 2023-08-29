@@ -55,29 +55,40 @@ class ItemSoup(SoupKitchen):
 if __name__ == "__main__":
     # bowl = SourceSoup("Sources.aspx")
     # bowl.cook_sources()
-    soup = SoupKitchen("Sources.aspx?ID=1")
-    soup.load_source_items(debug=True)
-    """
-    for i in range(1, 8):
+    # soup = SoupKitchen("Sources.aspx?ID=1")
+    # soup.load_source_items(debug=True)
+    for i in range(1, 4):
         soup = SoupKitchen(f"Domains.aspx?ID={i}")
+        """
         print(soup.url, soup.name)
-        soup.parse_item(debug=True, category="domains")
+        soup.parse_item(verbose=True, category="domains")
         soup = SoupKitchen(f"Deities.aspx?ID={i}")
-        soup.parse_item(debug=True, category="deities")
+        soup.parse_item(verbose=True, category="deities")
         soup = SoupKitchen(f"Heritages.aspx?ID={i}")
-        soup.parse_item(debug=True, category="heritages")
+        soup.parse_item(verbose=True, category="heritages")
         soup = SoupKitchen(f"Spells.aspx?ID={i}")
-        soup.parse_item(debug=True, category="spells")
+        soup.parse_item(verbose=True, category="spells")
         soup = SoupKitchen(f"Weapons.aspx?ID={i}")
-        soup.parse_item(debug=True, category="weapons")
+        soup.parse_item(verbose=True, category="weapons")
         soup = SoupKitchen(f"Traits.aspx?ID={i}")
-        soup.parse_item(debug=True, category="traits")
+        soup.parse_item(verbose=True, category="traits")
         soup = SoupKitchen(f"Ancestries.aspx?ID={i}")
-        soup.parse_item(debug=True, category="ancestries")
+        soup.parse_item(verbose=True, category="ancestries")
 
         soup = SoupKitchen(f"Feats.aspx?ID={i}")
-        soup.parse_item(debug=True, category="feats")
-
+        soup.parse_item(verbose=True, category="feats")
         soup = SoupKitchen(f"Equipment.aspx?ID={i}")
-        soup.parse_item(debug=True, category="equipment")
+        soup.parse_item(verbose=True, category="equipment")
         """
+        soup = SoupKitchen(f"Armor.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="armors")
+        soup = SoupKitchen(f"AnimalCompanions.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="animal_companions")
+        soup = SoupKitchen(f"Backgrounds.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="backgrounds")
+        soup = SoupKitchen(f"Bloodlines.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="bloodlines")
+    """
+    soup = SoupKitchen(f"Equipment.aspx?ID=1552")
+    soup.parse_item(verbose=True, category="equipment")
+    """
