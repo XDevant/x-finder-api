@@ -537,7 +537,7 @@ class SoupKitchen:
                 if result.titles[status.ended]["url"] == "":
                     result.titles[status.ended]["url"] = self.url
             if 'level' not in result.titles[status.ended].keys():
-                if 'level' in self.get("text_columns", category):
+                if 'level' in self.get("text_columns", category) and len(title_parts) > 1:
                     result.titles[status.ended]['level'] = title_parts[-1]
             if 'action' in self.get("text_columns", category):
                 try:
@@ -546,8 +546,9 @@ class SoupKitchen:
                     pass
 
     def find_nested_item_category(self, name, url, next_child=None):
-        next_model = "default"
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
+        if name.endswith("_tasks") and name.startswith("sample_"):
+            return "sample_tasks"
         name_model = self.get("", name)
         url_base = url.split('.')[0].strip().lower().replace(' ', '_').replace('-', '_')
         url_model = self.get("", url_base)
@@ -557,7 +558,7 @@ class SoupKitchen:
                 next_text = next_text.lower().strip(' (),;').replace(' ', '_')
                 if not next_text.endswith('s'):
                     next_text += 's'
-                next_model = self.get("", next_text.lower().strip(' (),;'))
+                next_model = self.get("", next_text)
                 if next_model not in ["rules", "default"]:
                     return next_model
         if url_model is not None and url_model not in ["rules", "default"]:
@@ -610,53 +611,68 @@ class SoupKitchen:
                     self.parsed_rows.append(title)
                 else:
                     self.nested_rows.append(title)
-        if verbose:
+        if debug or verbose:
             for title in result.titles:
-                if title and len(title) > 2 and 'x_finder_model' in title.keys():
+                if (title and len(title) > 2 and 'x_finder_model' in title.keys()) or verbose:
                     print(title)
-        if debug:
+        if debug or verbose:
             if result.parsed:
                 print(result.titles[0]["name"], result.parsed)
             if result.tails:
                 print(result.titles[0]["name"], result.tails)
 
     def read_soup(self, child, status, result, category, debug=False, verbose=False):
+        if child is None:
+            return
+        current_category = "default"
+        if 'x_finder_model' in result.titles[status.ended].keys():
+            current_category = result.titles[status.ended]['x_finder_model']
+
         if status.last_key:
-            if child.name and child.name in self.get("cell_ends", category):
-                self.store(status, result)
+            if child.name and child.name in self.get("cell_ends", current_category):
+                self.store(status, result, category, current_category)
                 status.last_key = ""
                 status.loaded_values = []
         if status.last_key:
             value = child.get_text().strip(',; \r\n')
             if value and value != '\n':
                 status.loaded_values.append(value)
-        elif child is not None and child.name and child.name in self.get("next_titles", category):
-            if status.family:
-                self.add_new_title(child, result, status, category)
-            else:
-                self.add_new_title(child, result, status)
 
-        elif child is not None and child.name and child.name in self.get("cell_starts", category):
-            key = child.get_text().strip(' ,;')
-            key = key.replace('-', '_')
-            key = key.replace(' ', '_')
+        elif child.name and child.name in self.get("next_titles", current_category):
+            key, value = self.format_key(child)
+            href = self.get_href(child)
+            if key:
+                if key in self.get("text_columns", category) + self.get("text_columns", current_category):
+                    status.last_key = key
+                    status.loaded_values = []
+                    if value:
+                        status.loaded_values.append(value)
+                elif category == "classes":
+                    test_category = self.find_nested_item_category(key, href)
+                    if test_category is not None and test_category not in ["default", "rules", category]:
+                        self.add_new_title(child, result, status, test_category)
+                    elif child.name != "h3":
+                        self.add_new_title(child, result, status, "class_features")
+                    else:
+                        status.last_key = key
+                elif status.family:
+                    self.add_new_title(child, result, status, category)
+                else:
+                    self.add_new_title(child, result, status)
+
+        elif child.name and child.name in self.get("cell_starts", current_category):
+            key, value = self.format_key(child)
             if key:
                 status.last_key = key.lower()
                 status.loaded_values = []
-                if key not in self.get("text_columns", category):
-                    title = result.titles[status.ended]
-                    if 'x_finder_model' in title.keys() and key not in self.get(
-                            "text_columns",
-                            title['x_finder_model']):
-                        test_category = self.find_nested_item_category(key,
-                                                                       title['url'],
-                                                                       child.next_sibling)
-                        if test_category is not None and test_category not in [category,
-                                                                               title['x_finder_model'],
-                                                                               ]:
-                            self.add_new_title(child, result, status, category=test_category)
+                if value:
+                    status.loaded_values.append(value)
+                if key not in self.get("text_columns", category) + self.get("text_columns", current_category):
+                    test_category = self.find_nested_item_category(key, self.get_href(child), child.next_sibling)
+                    if test_category is not None and test_category not in [category, current_category]:
+                        self.add_new_title(child, result, status, category=test_category)
 
-        elif child is not None and child.name == 'span':
+        elif child.name == 'span':
             link = child.find('a')
             if link and link['href'] and link.get_text():
                 if "Traits" in link['href']:
@@ -669,7 +685,7 @@ class SoupKitchen:
                 if link is not None:
                     self.read_soup(link, status, result, category, debug=debug, verbose=verbose)
 
-        elif child is not None and (child.name is None or child.name in ['a', 'u', 'i', 'ol', 'ul']):
+        elif child.name is None or child.name in self.get("desc_tags", current_category):
             values = []
             if child.name in ['ol', 'ul']:
                 values = child.find_all('li')
@@ -691,47 +707,106 @@ class SoupKitchen:
                     result.titles[status.ended]["description"] = []
                 result.titles[status.ended]["description"] += values
 
-        elif child is not None and child.name == "table":
-            table = []
-            row_len = 0
-            for tr in child.find_all('tr'):
-                row = [td.get_text() for td in tr.find_all('td')]
-                if len(row) < row_len:
-                    row = [table[-1][0]] + row
-                row_len = max(row_len, len(row))
-                table.append(row)
-            result.titles[status.ended]["table"] = table
+        elif child.name == "table" or child.name == "details" and 'table' in [c.name for c in child.children]:
+            key, name, description = [""] * 3
+            if result.titles[status.ended]["name"].startswith('Table '):
+                key, name = self.format_key(text=result.titles[status.ended]["name"])
+                description = result.titles[status.ended].pop("description", "")
+                result.titles = result.titles[:status.ended]
+                status.ended -= 1
+            elif child.find('summary') is not None:
+                key, name = self.format_key(child.find('summary'))
 
-        elif child is not None and child.get_text().strip(' ,;'):
-            if "description" not in result.titles[status.ended].keys():
-                result.titles[status.ended]["description"] = []
-            result.titles[status.ended]["description"].append(child.get_text().strip(' ,;\n\r'))
+            if child.name == "table":
+                table = self.load_nested_table(child)
+            else:
+                table = self.load_nested_table(child.find('table'))
+
+            if category == "classes":
+                if "table_class_features" not in result.titles[0].keys():
+                    result.titles[0]["table_class_features"] = table
+                elif "spells" in result.titles[0].keys():
+                    result.titles[0]["table_spells_per_day"] = table
+                else:
+                    result.titles[0]["table_other"] = table
+            elif key:
+                result.titles[0][key] = {"name": name, "description": description, "table": table}
+            else:
+                result.titles[status.ended]["table"] = table
+
+        elif child.name in ["div", "details"]:
+            children = child.children
+            next_child = next(children)
+            if next:
+                self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
+
+        elif child.get_text().strip(' ,;'):
+            if child.name in ["h1", "h2"] and child.get_text().startswith("Table "):
+                child_name = child.get_text().replace('–', '-').replace(' ', '_').lower().strip()
+                title_name = result.titles[status.ended]["name"].replace('–', '-').replace(' ', '_').lower().strip()
+                if child_name != title_name:
+                    self.add_new_title(child, result, status, current_category)
+            else:
+                if "description" not in result.titles[status.ended].keys():
+                    result.titles[status.ended]["description"] = []
+                result.titles[status.ended]["description"].append(child.get_text().strip(' ,;\n\r'))
         if child:
             next_child = child.next_sibling
             if next_child:
                 return self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
         if status.last_key and status.loaded_values:
-            self.store(status, result)
+            self.store(status, result, category, current_category)
         return
 
-    def store(self, status, result):
+    @staticmethod
+    def load_nested_table(child):
+        table = []
+        row_len = 0
+        for tr in child.find_all('tr'):
+            row = [td.get_text() for td in tr.find_all('td')]
+            if len(row) < row_len:
+                row = [table[-1][0]] + row
+            row_len = max(row_len, len(row))
+            table.append(row)
+        return table
+
+    @staticmethod
+    def format_key(nav_string=None, text=""):
+        if nav_string is not None:
+            key = nav_string.get_text()
+        else:
+            key = text
+        key_parts = key.split(':')
+        key = key_parts[0].strip(' ,;').lower().replace(' ', '_').replace('-', '_').replace('–', '_')
+        value = ""
+        if len(key_parts) > 1:
+            value = ":".join(key_parts[1:]).strip(' ,;')
+        return key, value
+
+    @staticmethod
+    def get_href(child):
+        if child is None:
+            return ""
+        if child.name == 'a':
+            return child["href"]
+        link = child.find('a')
+        if link is not None:
+            return link["href"]
+        return ""
+
+    def store(self, status, result, category, current_category):
         match = False
-        if 'x_finder_model' in result.titles[0].keys():
-            category = result.titles[0]['x_finder_model']
-            text_cols = self.get("text_columns", category)
-            if status.last_key in text_cols or status.last_key.split('_')[0] in text_cols:
-                match = True
-                if status.last_key not in result.titles[0].keys() and not status.family:
-                    result.titles[0][status.last_key] = status.loaded_values
-                    return
-        if 'x_finder_model' in result.titles[status.ended].keys():
-            if result.titles[status.ended]['x_finder_model']:
-                category = result.titles[status.ended]['x_finder_model']
-                text_cols = self.get("text_columns", category)
-                if status.last_key in text_cols:
-                    if status.last_key not in result.titles[status.ended].keys():
-                        result.titles[status.ended][status.last_key] = status.loaded_values
-                        return
+        text_cols = self.get("text_columns", category)
+        if status.last_key in text_cols or status.last_key.split('_')[0] in text_cols:
+            match = True
+            if status.last_key not in result.titles[0].keys() and not status.family:
+                result.titles[0][status.last_key] = status.loaded_values
+                return
+        current_text_cols = self.get("text_columns", current_category)
+        if status.last_key in current_text_cols:
+            if status.last_key not in result.titles[status.ended].keys():
+                result.titles[status.ended][status.last_key] = status.loaded_values
+                return
         if match and status.last_key == 'advanced_domain_spell':
             if 'advanced_apocryphal_domain_spell' not in result.titles[0].keys():
                 result.titles[0]['advanced_apocryphal_domain_spell'] = status.loaded_values
@@ -752,6 +827,9 @@ class SoupKitchen:
                         result.titles[status.ended][nested_cols[2 * i]] = status.last_key
                         result.titles[status.ended][nested_cols[2 * i + 1]] = status.loaded_values
                         return
+        if self.get("overload", current_category):
+            result.titles[status.ended][status.last_key] = status.loaded_values
+            return
         result.parsed.append({status.last_key: status.loaded_values})
 
     def parse_item_data(self, show=False, category="default"):

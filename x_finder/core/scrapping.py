@@ -58,8 +58,8 @@ if __name__ == "__main__":
     # soup = SoupKitchen("Sources.aspx?ID=1")
     # soup.load_source_items(debug=True)
     for i in range(1, 4):
-        soup = SoupKitchen(f"Domains.aspx?ID={i}")
         """
+        soup = SoupKitchen(f"Domains.aspx?ID={i}")
         print(soup.url, soup.name)
         soup.parse_item(verbose=True, category="domains")
         soup = SoupKitchen(f"Deities.aspx?ID={i}")
@@ -74,12 +74,10 @@ if __name__ == "__main__":
         soup.parse_item(verbose=True, category="traits")
         soup = SoupKitchen(f"Ancestries.aspx?ID={i}")
         soup.parse_item(verbose=True, category="ancestries")
-
         soup = SoupKitchen(f"Feats.aspx?ID={i}")
         soup.parse_item(verbose=True, category="feats")
         soup = SoupKitchen(f"Equipment.aspx?ID={i}")
         soup.parse_item(verbose=True, category="equipment")
-        """
         soup = SoupKitchen(f"Armor.aspx?ID={i}")
         soup.parse_item(verbose=True, category="armors")
         soup = SoupKitchen(f"AnimalCompanions.aspx?ID={i}")
@@ -88,6 +86,11 @@ if __name__ == "__main__":
         soup.parse_item(verbose=True, category="backgrounds")
         soup = SoupKitchen(f"Bloodlines.aspx?ID={i}")
         soup.parse_item(verbose=True, category="bloodlines")
+        soup = SoupKitchen(f"Classes.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="classes")
+    """
+        soup = SoupKitchen(f"Skills.aspx?ID={i}")
+        soup.parse_item(verbose=True, category="skills")
     """
     soup = SoupKitchen(f"Equipment.aspx?ID=1552")
     soup.parse_item(verbose=True, category="equipment")
