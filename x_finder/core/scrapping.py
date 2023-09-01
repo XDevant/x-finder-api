@@ -55,8 +55,8 @@ class ItemSoup(SoupKitchen):
 if __name__ == "__main__":
     # bowl = SourceSoup("Sources.aspx")
     # bowl.cook_sources()
-    # soup = SoupKitchen("Sources.aspx?ID=1")
-    # soup.load_source_items(debug=True)
+    soup = SoupKitchen("Sources.aspx?ID=1")
+    soup.load_source_items(debug=True)
     for i in range(1, 4):
         """
         soup = SoupKitchen(f"Domains.aspx?ID={i}")
@@ -88,10 +88,9 @@ if __name__ == "__main__":
         soup.parse_item(verbose=True, category="bloodlines")
         soup = SoupKitchen(f"Classes.aspx?ID={i}")
         soup.parse_item(verbose=True, category="classes")
-    """
         soup = SoupKitchen(f"Skills.aspx?ID={i}")
-        soup.parse_item(verbose=True, category="skills")
-    """
+        soup.parse_item(debug=True, category="skills")
+
     soup = SoupKitchen(f"Equipment.aspx?ID=1552")
     soup.parse_item(verbose=True, category="equipment")
     """

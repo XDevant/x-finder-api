@@ -292,11 +292,19 @@ class SoupKitchen:
         else:
             category_data = {category: from_df.to_dict('records')}
         completed_categories, nested_categories = self.complete_all_category_items(category_data, debug=debug)
+        normed_category_dfs, completed_category_dfs, = self.build_dfs(completed_categories, source_name=source_name)
+        normed_nested_dfs, completed_nested_dfs, = self.build_dfs(nested_categories,
+                                                                  source_name=source_name,
+                                                                  suff="nested")
+        self.completed_dfs = completed_category_dfs
+        self.normed_dfs = normed_category_dfs
+
+    def build_dfs(self, dict_of_dicts, source_name="Unknown", suff=""):
         completed_category_dfs = {}
         normed_category_dfs = {}
-        for key in completed_categories.keys():
+        for key in dict_of_dicts.keys():
             app = self.get("app", key)
-            df = pd.DataFrame.from_records(data=completed_categories[key])
+            df = pd.DataFrame.from_records(data=dict_of_dicts[key])
             try:
                 df = self.norm_df(df, key)
                 normed_category_dfs[key] = df
@@ -305,9 +313,10 @@ class SoupKitchen:
                 print(f"An error occurred while norming {key} df")
                 completed_category_dfs[key] = df
                 suffix = "completed"
+            if suff:
+                suffix += "_" + suff
             self.save(df, f"{key}_{suffix}", directory=source_name, app=app)
-        self.completed_dfs = completed_category_dfs
-        self.normed_dfs = completed_category_dfs
+        return normed_category_dfs, completed_category_dfs
 
     def extract_source_links(self, offset):
         if self.soup:
@@ -329,19 +338,26 @@ class SoupKitchen:
         print("No soup found, did you cook it?")
         return ""
 
-    def complete_all_category_items(self, category_dict, debug=False):
+    def complete_all_category_items(self, category_dict, debug=False, verbose=False):
         result_dict = {}
         nested_dict = {}
         for key, value in category_dict.items():
-            if key in ["spells", "equipment"]:
-                result_dict[key], nested_dict[key] = self.complete_category_items(key, value, debug=debug)
+            if key in ["spells", "equipment", "skills"]:
+                result_dict[key], partial_nested = self.complete_category_items(key,
+                                                                                value,
+                                                                                debug=debug,
+                                                                                verbose=verbose)
+                for nested_category in partial_nested.keys():
+                    if nested_category not in nested_dict.keys():
+                        nested_dict[nested_category] = []
+                    nested_dict[nested_category] += partial_nested[nested_category]
         return result_dict, nested_dict
 
     @chrono
-    def complete_category_items(self, category, data, limit=30, debug=False):
+    def complete_category_items(self, category, data, limit=10, debug=False, verbose=False):
         """"""
         results = []
-        nesteds = []
+        nesteds = {}
         count = 0
         for row in data:
             try:
@@ -349,16 +365,19 @@ class SoupKitchen:
             except requests.exceptions.ConnectTimeout:
                 print(f"Connection Timeout for {row}")
                 continue
-            item_bowl.parse_item(category=category, debug=True)
+            item_bowl.parse_item(category=category, debug=debug, verbose=verbose)
 
             result = item_bowl.parsed_rows
             nested = item_bowl.nested_rows
             results += result
-            nesteds += nested
+            for key in nested.keys():
+                if key not in nesteds.keys():
+                    nesteds[key] = []
+                nesteds[key] += nested[key]
             count += 1
             if debug and count == limit:
                 break
-        print(len(results))
+        print(f"Extracted {len(results)}/{count} items")
         return results, nesteds
 
     @staticmethod
@@ -454,12 +473,6 @@ class SoupKitchen:
 
     def find_start_broken(self, content, status, result, category, debug=False, verbose=False):
         """
-        if verbose:
-            print(f"Secondary title: {result.titles[status.ended]} found for family {result.titles[0]}")
-            return broken_title.find_next_sibling()
-        if debug or verbose:
-            print(f"unable to find members of family {result.titles[0]}")
-            return None
         """
         broken_title = content
         if broken_title is not None and broken_title.name in [None, 'a']:
@@ -483,7 +496,8 @@ class SoupKitchen:
                                       "url": url,
                                       "x_finder_model": category})
                 status.ended = len(result.titles) - 1
-                print(f"found name {name} for {broken_title}")
+                if debug:
+                    print(f"found name {name} for {broken_title}")
                 title_end = broken_title.next_sibling
                 if title_end and title_end.name == "span":
                     text = title_end.get_text().strip(' ,;')
@@ -599,27 +613,44 @@ class SoupKitchen:
                 self.read_soup(start_broken, status, result, category, debug=debug, verbose=verbose)
 
         self.parsed_rows = []
-        self.nested_rows = []
+        self.nested_rows = {}
+        trained = False
         for title in result.titles:
-            if title and len(title) > 2 and 'x_finder_model' in title.keys():
-                if title['x_finder_model'] == category:
+            if " Trained Actions" in title["name"]:
+                trained = True
+            if title and len(title) > 3 and 'x_finder_model' in title.keys():
+                current_category = title['x_finder_model']
+                if current_category == category:
                     if 'level' in result.titles[0].keys() and 'level' not in title.keys():
                         print(title)
                         continue
-                    if result.titles[0]['name'] == 'Scroll':
-                        print(result.titles)
                     self.parsed_rows.append(title)
                 else:
-                    self.nested_rows.append(title)
-        if debug or verbose:
+                    related_item = result.titles[0]["name"].split('(')[0].strip()
+                    title["x_finder_related_item"] = related_item
+                    title["x_finder_related_model"] = category
+                    if current_category == "actions" and category == "skills" and trained:
+                        if "prerequisite" not in title.keys():
+                            title["prerequisite"] = []
+                        title["prerequisite"].append(f"Trained in {related_item}")
+                    if current_category not in self.nested_rows.keys():
+                        self.nested_rows[current_category] = []
+                    self.nested_rows[current_category].append(title)
+
+        if verbose:
             for title in result.titles:
-                if (title and len(title) > 2 and 'x_finder_model' in title.keys()) or verbose:
+                if (title and len(title) > 3 and 'x_finder_model' in title.keys()) or verbose:
                     print(title)
-        if debug or verbose:
+        if verbose:
             if result.parsed:
                 print(result.titles[0]["name"], result.parsed)
             if result.tails:
                 print(result.titles[0]["name"], result.tails)
+        if debug:
+            for title in self.parsed_rows:
+                print(title)
+            for key in self.nested_rows.keys():
+                print(self.nested_rows[key])
 
     def read_soup(self, child, status, result, category, debug=False, verbose=False):
         if child is None:
@@ -716,23 +747,29 @@ class SoupKitchen:
                 status.ended -= 1
             elif child.find('summary') is not None:
                 key, name = self.format_key(child.find('summary'))
+            else:
+                key, name = self.format_key(text=result.titles[status.ended]["name"])
+                key = "table_" + key
 
             if child.name == "table":
                 table = self.load_nested_table(child)
             else:
                 table = self.load_nested_table(child.find('table'))
 
-            if category == "classes":
-                if "table_class_features" not in result.titles[0].keys():
-                    result.titles[0]["table_class_features"] = table
-                elif "spells" in result.titles[0].keys():
-                    result.titles[0]["table_spells_per_day"] = table
-                else:
-                    result.titles[0]["table_other"] = table
-            elif key:
+            if key and key not in result.titles[0].keys():
                 result.titles[0][key] = {"name": name, "description": description, "table": table}
             else:
-                result.titles[status.ended]["table"] = table
+                if key is None:
+                    key = f"table_{result.titles[0]['name']}"
+                if category == "classes" and "spells" in result.titles[0].keys():
+                    key = f"table_spells_per_day_{result.titles[0]['name']}"
+                    result.titles[0][key] = {"name": name, "description": description, "table": table}
+                else:
+                    for i in range(1, 50):
+                        test = key + "_" + str(i)
+                        if test not in result.titles[0].keys():
+                            result.titles[0][test] = {"name": name, "description": description, "table": table}
+                            break
 
         elif child.name in ["div", "details"]:
             children = child.children
@@ -947,7 +984,7 @@ class SoupKitchen:
 
     @staticmethod
     def format_column_name(name, url=False):
-        header = name.replace(" ", "_")
+        header = name.replace(" ", "_").replace("-", "_")
         if url and "url" not in header:
             header += "_url"
         return header.lower()
