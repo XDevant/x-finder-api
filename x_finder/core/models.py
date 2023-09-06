@@ -40,6 +40,7 @@ class Language(models.Model):
 
 class Trait(models.Model):
     name = models.CharField(max_length=25)
+    subtype = models.CharField(max_length=25)
     nethys_url = models.URLField()
     source = models.ForeignKey(
         to=Source,

@@ -10,7 +10,7 @@ item_category_arguments = {
                 "item_url_column": 'name',
                 "text_columns": [],
                 "url_columns": [],
-
+                "model_columns": ["name", "nethys_url", "source", "source_page", "description"],
                 "row_separator": '<br/><b>',
                 "row_sep_bis": '',
                 "start": '<b>Source',
@@ -126,7 +126,7 @@ item_category_arguments = {
                   },
     "sample_tasks": {"app": "core",
                      "text_columns": ["untrained", "trained", "expert", "master", "legendary"],
-               },
+                     },
     "skills": {"app": "core",
                "text_columns": ["source"],
                "next_titles": ["h1", "h3"],
@@ -145,8 +145,9 @@ item_category_arguments = {
                },
     "traits": {"app": "core",
                "text_columns": ["source"],
+               "model_columns": ["name", "subtype", "nethys_url", "source", "source_page", "description"],
                "tail_start": '</sup><br/>',
-               "subtype": True
+               "subtype": True,
                },
     "weapons": {"app": "core",
                 "text_columns": ["source", "traits", "price", "damage", "bulk", "hands", "type",

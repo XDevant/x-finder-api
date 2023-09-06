@@ -14,5 +14,5 @@ class Campaign(models.Model):
 
 class Pantheon(models.Model):
     """A pantheon is a collection of gods relative to a culture.
-    A campaign can have several, like Romans and Greek god for example."""
+    A campaign can have several, like Romans and Greek gods for example."""
     name = models.CharField(max_length=25)

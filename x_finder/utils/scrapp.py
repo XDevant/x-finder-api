@@ -292,16 +292,34 @@ class SoupKitchen:
         else:
             category_data = {category: from_df.to_dict('records')}
         completed_categories, nested_categories = self.complete_all_category_items(category_data, debug=debug)
-        normed_category_dfs, completed_category_dfs, = self.build_dfs(completed_categories, source_name=source_name)
-        normed_nested_dfs, completed_nested_dfs, = self.build_dfs(nested_categories,
-                                                                  source_name=source_name,
-                                                                  suff="nested")
-        self.completed_dfs = completed_category_dfs
-        self.normed_dfs = normed_category_dfs
+        normed_dfs, completed_dfs, finalized_dfs = self.build_dfs(completed_categories, source_name=source_name)
+        normed_nested_dfs, completed_nested_dfs, finalized_nested_dfs = self.build_dfs(nested_categories,
+                                                                                       source_name=source_name,
+                                                                                       suff="nested")
+        for key in normed_nested_dfs.keys():
+            if key not in normed_dfs.keys():
+                normed_dfs[key] = normed_nested_dfs[key]
+        self.completed_dfs = completed_dfs
+        self.normed_dfs = normed_dfs
+
+    def extract_model_dfs(self, df, key):
+        columns = self.get("model_columns", key)
+        for column in columns:
+            join = "; "
+            if column == "description":
+                join = " "
+            df[column] = df.apply(
+                lambda r: join.join(r[column]) if isinstance(r[column], list) else r[column],
+                axis=1)
+        if "description_links" in df.columns and "description" in columns:
+            columns.append("description_links")
+        model_df = df[columns]
+        return model_df
 
     def build_dfs(self, dict_of_dicts, source_name="Unknown", suff=""):
         completed_category_dfs = {}
         normed_category_dfs = {}
+        finalized_category_dfs = {}
         for key in dict_of_dicts.keys():
             app = self.get("app", key)
             df = pd.DataFrame.from_records(data=dict_of_dicts[key])
@@ -313,10 +331,17 @@ class SoupKitchen:
                 print(f"An error occurred while norming {key} df")
                 completed_category_dfs[key] = df
                 suffix = "completed"
+            if suffix == "normed":
+                try:
+                    model_df = self.extract_model_dfs(df, key)
+                    finalized_category_dfs[key] = model_df
+                    self.save(model_df, f"{key}_finalized", directory=source_name, app=app)
+                except Exception:
+                    print(f"An error occurred while finalizing {key} df")
             if suff:
                 suffix += "_" + suff
             self.save(df, f"{key}_{suffix}", directory=source_name, app=app)
-        return normed_category_dfs, completed_category_dfs
+        return normed_category_dfs, completed_category_dfs, finalized_category_dfs
 
     def extract_source_links(self, offset):
         if self.soup:
@@ -342,7 +367,7 @@ class SoupKitchen:
         result_dict = {}
         nested_dict = {}
         for key, value in category_dict.items():
-            if key in ["spells", "equipment", "skills"]:
+            if key in ["traits"]:
                 result_dict[key], partial_nested = self.complete_category_items(key,
                                                                                 value,
                                                                                 debug=debug,
@@ -354,7 +379,7 @@ class SoupKitchen:
         return result_dict, nested_dict
 
     @chrono
-    def complete_category_items(self, category, data, limit=10, debug=False, verbose=False):
+    def complete_category_items(self, category, data, limit=20, debug=False, verbose=False):
         """"""
         results = []
         nesteds = {}
@@ -369,6 +394,8 @@ class SoupKitchen:
 
             result = item_bowl.parsed_rows
             nested = item_bowl.nested_rows
+            if result[0]["name"] in row["name"] and self.get("subtype", category) and "subtype" not in result[0].keys():
+                result[0]["name"] = row["name"]
             results += result
             for key in nested.keys():
                 if key not in nesteds.keys():
@@ -381,7 +408,20 @@ class SoupKitchen:
         return results, nesteds
 
     @staticmethod
-    def parse_source_links(item_list):
+    def snake_to_under(snake):
+        if snake is None or not isinstance(snake, str) or len(snake) == 0:
+            print("No string to convert")
+            return snake
+        under = snake[0].lower()
+        if len(snake) == 1:
+            return under
+        for char in snake[1:]:
+            if char.isupper() or char == " ":
+                under += "_"
+            under += char.lower()
+        return under
+
+    def parse_source_links(self, item_list):
         category_data = {}
         no_category_data = {}
         flags = []
@@ -394,7 +434,8 @@ class SoupKitchen:
             else:
                 continue
             if url:
-                item_category = url.split('.')[0].lower()
+                snake_item_category = url.split('.')[0]
+                item_category = self.snake_to_under(snake_item_category)
             else:
                 item_category = "unknown"
 
@@ -419,7 +460,7 @@ class SoupKitchen:
             return text.strip()
 
     def norm_df(self, df, key):
-        if self.get("subtype", key) and "name" in df.columns:
+        if self.get("subtype", key) and "name" in df.columns and "subtype" not in df.columns:
             df["subtype"] = df.apply(
                 lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
                 axis=1)
@@ -441,6 +482,8 @@ class SoupKitchen:
                 axis=1)
             df["source"] = df.apply(lambda r: r["sources"][-2].split('pg. ')[0].strip(), axis=1)
             df["source_update"] = df.apply(lambda r: r["sources"][-1].strip(), axis=1)
+        df.rename(columns={'url': 'nethys_url'},
+                  inplace=True)
         return df
 
     def find_start_ok(self, content, status, result, category, debug=False, verbose=False):
@@ -579,7 +622,7 @@ class SoupKitchen:
             return url_model
         if name_model != "default":
             return name_model
-        return "default"
+        return ""
 
     def parse_item(self, category="default", debug=False, verbose=False):
         if self.soup:
@@ -633,20 +676,28 @@ class SoupKitchen:
                         if "prerequisite" not in title.keys():
                             title["prerequisite"] = []
                         title["prerequisite"].append(f"Trained in {related_item}")
-                    if current_category not in self.nested_rows.keys():
-                        self.nested_rows[current_category] = []
-                    self.nested_rows[current_category].append(title)
+                    nested = False
+                    if current_category in ["class_features", "diseases", "key_terms", "poison"]:
+                        nested = True
+                    if current_category == "actions" and "action" in title.keys():
+                        nested = True
+                    if nested:
+                        if current_category not in self.nested_rows.keys():
+                            self.nested_rows[current_category] = []
+                        self.nested_rows[current_category].append(title)
+                    else:
+                        if current_category not in self.parsed_rows[0].keys():
+                            self.parsed_rows[0][current_category] = title
 
         if verbose:
             for title in result.titles:
                 if (title and len(title) > 3 and 'x_finder_model' in title.keys()) or verbose:
                     print(title)
-        if verbose:
             if result.parsed:
                 print(result.titles[0]["name"], result.parsed)
             if result.tails:
                 print(result.titles[0]["name"], result.tails)
-        if debug:
+        if debug or verbose:
             for title in self.parsed_rows:
                 print(title)
             for key in self.nested_rows.keys():
@@ -667,6 +718,14 @@ class SoupKitchen:
         if status.last_key:
             value = child.get_text().strip(',; \r\n')
             if value and value != '\n':
+                if status.last_key == "level" and len(value) > 3:
+                    values = value.split('. ')
+                    value = values[0]
+                    if len(values) > 1:
+                        description = ". ".join(values[1:])
+                        if "description" not in result.titles[status.ended].keys():
+                            result.titles[status.ended]["description"] = []
+                        result.titles[status.ended]["description"].append(description)
                 status.loaded_values.append(value)
 
         elif child.name and child.name in self.get("next_titles", current_category):
@@ -724,15 +783,14 @@ class SoupKitchen:
             else:
                 value = child.get_text().strip(' ,;\n\r')
                 if value:
-                    values.append(value)
-                    if child.name == 'a' or child.name is not None and child.find('a') is not None:
-                        if child.name == 'a':
-                            url = child['href']
-                        else:
-                            url = child.find('a')['href']
+                    url = self.get_href(child)
+                    if url:
+                        related_model = self.snake_to_under(url.split('.')[0])
                         if "description_links" not in result.titles[status.ended].keys():
                             result.titles[status.ended]["description_links"] = []
-                        result.titles[status.ended]["description_links"].append({"name": value, "url": url})
+                        result.titles[status.ended]["description_links"].append(f"{value}: {related_model}")
+                        value = "<i>" + value + "</i>"
+                    values.append(value)
             if values:
                 if "description" not in result.titles[status.ended].keys():
                     result.titles[status.ended]["description"] = []
@@ -784,16 +842,22 @@ class SoupKitchen:
                 if child_name != title_name:
                     self.add_new_title(child, result, status, current_category)
             else:
+                text = child.get_text().strip(' ,;\n\r')
+                if child.name in ["h1", "h2", "h3", "h4"]:
+                    text = "<b>" + text + "</b>"
                 if "description" not in result.titles[status.ended].keys():
                     result.titles[status.ended]["description"] = []
-                result.titles[status.ended]["description"].append(child.get_text().strip(' ,;\n\r'))
+                result.titles[status.ended]["description"].append(text)
         if child:
             next_child = child.next_sibling
             if next_child:
-                return self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
+                try:
+                    return self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
+                except RecursionError:
+                    pass
         if status.last_key and status.loaded_values:
             self.store(status, result, category, current_category)
-        return
+        return None
 
     @staticmethod
     def load_nested_table(child):
@@ -826,10 +890,13 @@ class SoupKitchen:
             return ""
         if child.name == 'a':
             return child["href"]
-        link = child.find('a')
-        if link is not None:
-            return link["href"]
-        return ""
+        try:
+            link = child.find('a')["href"]
+            return link
+        except AttributeError:
+            return ""
+        except TypeError:
+            return ""
 
     def store(self, status, result, category, current_category):
         match = False

@@ -57,8 +57,8 @@ if __name__ == "__main__":
     # bowl.cook_sources()
     soup = SoupKitchen("Sources.aspx?ID=1")
     soup.load_source_items(debug=True)
+    """
     for i in range(1, 4):
-        """
         soup = SoupKitchen(f"Domains.aspx?ID={i}")
         print(soup.url, soup.name)
         soup.parse_item(verbose=True, category="domains")
