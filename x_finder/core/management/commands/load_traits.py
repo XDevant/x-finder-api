@@ -1,5 +1,4 @@
 from django.core.management.base import BaseCommand
-from django.conf import settings
 from x_finder.core import models
 from x_finder.core.scrapping import SourceSoup
 
@@ -11,8 +10,7 @@ class Command(BaseCommand):
         pass
 
     def handle(self, *args, **options):
-        df = SourceSoup.load("Traits", app="core", directory="Core Rulebook", suffix="normed")
-        df = SourceSoup.select_df(df)
+        df = SourceSoup.load(name="traits", app="core", directory="Core Rulebook", suffix="finalized")
         model_list = [model for model in dir(models) if model[0].isupper()]
         print(model_list)
         list_of_items = df.to_dict('record')

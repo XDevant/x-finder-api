@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # bowl = SourceSoup("Sources.aspx")
     # bowl.cook_sources()
     soup = SoupKitchen("Sources.aspx?ID=1")
-    soup.load_source_items(debug=True)
+    soup.load_source_items(category_filter=["skills", "skills_general"], debug=True)
     """
     for i in range(1, 4):
         soup = SoupKitchen(f"Domains.aspx?ID={i}")

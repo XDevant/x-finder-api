@@ -117,7 +117,8 @@ class SoupKitchen:
         df.to_csv(f"{path}\\{name}.csv", sep='|', index=False)
         print(f"{name} successfully saved at {path}.")
 
-    def load(self, name, app="utils", directory=None, suffix="raw"):
+    @staticmethod
+    def load(name, app="utils", directory=None, suffix="raw"):
         if directory:
             pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{directory}\\{name}_{suffix}.csv"
         else:
@@ -265,17 +266,21 @@ class SoupKitchen:
                           update=False,
                           offset=3,
                           from_df=None,
+                          category_filter=None,
                           source_name="unknown",
                           category="default",
-                          debug=False):
+                          debug=False,
+                          verbose=False):
         """ The base use is to extract a list of links and then extract data from those links.
         Links encountered will be sorted into different category according to the url found and stored into a dict
         :param update: Bool used as a suffix for filename of csv, used by the commands when loading into db
         :param offset: Int used to filter the first source_links only in extract_source_links
         :param from_df: Panda df used to complete a single item category previously saved, bypass extract_source_links
+        :param category_filter: List of categories you want to complete. If None, all categories will be completed
         :param source_name: String used with from_df, name of the subdirectory where completed df will be saved
         :param category: String base name of the file if from_df is not none
         :param debug: Bool
+        :param verbose: Bool
         :return: nothing
         """
         if not from_df:
@@ -291,7 +296,11 @@ class SoupKitchen:
                 self.save(df, f"{key}_raw", directory=source_name)
         else:
             category_data = {category: from_df.to_dict('records')}
-        completed_categories, nested_categories = self.complete_all_category_items(category_data, debug=debug)
+        if category_filter is not None and isinstance(category_filter, list):
+            category_data = {key: value for key, value in category_data.items() if key in category_filter}
+        completed_categories, nested_categories = self.complete_all_category_items(category_data,
+                                                                                   debug=debug,
+                                                                                   verbose=verbose)
         normed_dfs, completed_dfs, finalized_dfs = self.build_dfs(completed_categories, source_name=source_name)
         normed_nested_dfs, completed_nested_dfs, finalized_nested_dfs = self.build_dfs(nested_categories,
                                                                                        source_name=source_name,
@@ -304,6 +313,11 @@ class SoupKitchen:
 
     def extract_model_dfs(self, df, key):
         columns = self.get("model_columns", key)
+        if columns:
+            columns = [column for column in columns if column in df.columns]
+        else:
+            excluded = self.get("model_excluded_columns", key)
+            columns = [column for column in df.columns if column not in excluded]
         for column in columns:
             join = "; "
             if column == "description":
@@ -367,15 +381,14 @@ class SoupKitchen:
         result_dict = {}
         nested_dict = {}
         for key, value in category_dict.items():
-            if key in ["traits"]:
-                result_dict[key], partial_nested = self.complete_category_items(key,
-                                                                                value,
-                                                                                debug=debug,
-                                                                                verbose=verbose)
-                for nested_category in partial_nested.keys():
-                    if nested_category not in nested_dict.keys():
-                        nested_dict[nested_category] = []
-                    nested_dict[nested_category] += partial_nested[nested_category]
+            result_dict[key], partial_nested = self.complete_category_items(key,
+                                                                            value,
+                                                                            debug=debug,
+                                                                            verbose=verbose)
+            for nested_category in partial_nested.keys():
+                if nested_category not in nested_dict.keys():
+                    nested_dict[nested_category] = []
+                nested_dict[nested_category] += partial_nested[nested_category]
         return result_dict, nested_dict
 
     @chrono
@@ -436,6 +449,8 @@ class SoupKitchen:
             if url:
                 snake_item_category = url.split('.')[0]
                 item_category = self.snake_to_under(snake_item_category)
+                if "General=true" in url:
+                    item_category += "_general"
             else:
                 item_category = "unknown"
 
@@ -460,8 +475,9 @@ class SoupKitchen:
             return text.strip()
 
     def norm_df(self, df, key):
-        if self.get("subtype", key) and "name" in df.columns and "subtype" not in df.columns:
-            df["subtype"] = df.apply(
+        subtype = self.get("subtype", key)
+        if subtype and "name" in df.columns and subtype not in df.columns:
+            df[subtype] = df.apply(
                 lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
                 axis=1)
             df["name"] = df.apply(lambda r: r["name"].split('(')[0].strip(), axis=1)
@@ -482,8 +498,10 @@ class SoupKitchen:
                 axis=1)
             df["source"] = df.apply(lambda r: r["sources"][-2].split('pg. ')[0].strip(), axis=1)
             df["source_update"] = df.apply(lambda r: r["sources"][-1].strip(), axis=1)
-        df.rename(columns={'url': 'nethys_url'},
-                  inplace=True)
+        columns = {'url': 'nethys_url'}
+        if "x_finder_related_model" in df.columns and "subtype" not in df.columns:
+            columns['x_finder_related_model'] = "subtype"
+        df.rename(columns=columns, inplace=True)
         return df
 
     def find_start_ok(self, content, status, result, category, debug=False, verbose=False):
@@ -658,6 +676,8 @@ class SoupKitchen:
         self.parsed_rows = []
         self.nested_rows = {}
         trained = False
+        if category == "skills_general" and "(Trained)" in result.titles[0]["name"]:
+            trained = True
         for title in result.titles:
             if " Trained Actions" in title["name"]:
                 trained = True
@@ -672,16 +692,17 @@ class SoupKitchen:
                     related_item = result.titles[0]["name"].split('(')[0].strip()
                     title["x_finder_related_item"] = related_item
                     title["x_finder_related_model"] = category
-                    if current_category == "actions" and category == "skills" and trained:
+                    check_1 = current_category == "actions" and trained
+                    check_2 = category == "skills" or category == "skills_general"
+                    if check_1 and check_2:
                         if "prerequisite" not in title.keys():
                             title["prerequisite"] = []
-                        title["prerequisite"].append(f"Trained in {related_item}")
-                    nested = False
-                    if current_category in ["class_features", "diseases", "key_terms", "poison"]:
-                        nested = True
-                    if current_category == "actions" and "action" in title.keys():
-                        nested = True
-                    if nested:
+                        if category == "skills":
+                            title["prerequisite"].append(f"Trained in {related_item}")
+                        else:
+                            title["prerequisite"].append("Trained in related skill")
+
+                    if self.get("nested", current_category):
                         if current_category not in self.nested_rows.keys():
                             self.nested_rows[current_category] = []
                         self.nested_rows[current_category].append(title)
@@ -716,8 +737,8 @@ class SoupKitchen:
                 status.last_key = ""
                 status.loaded_values = []
         if status.last_key:
-            value = child.get_text().strip(',; \r\n')
-            if value and value != '\n':
+            value = self.clean_text(child.get_text())
+            if value:
                 if status.last_key == "level" and len(value) > 3:
                     values = value.split('. ')
                     value = values[0]
@@ -732,21 +753,21 @@ class SoupKitchen:
             key, value = self.format_key(child)
             href = self.get_href(child)
             if key:
+                test_category = self.find_nested_item_category(key, href)
                 if key in self.get("text_columns", category) + self.get("text_columns", current_category):
                     status.last_key = key
                     status.loaded_values = []
                     if value:
                         status.loaded_values.append(value)
+                elif status.family:
+                    self.add_new_title(child, result, status, category)
+                elif test_category is not None and test_category not in ["default", "rules", category]:
+                    self.add_new_title(child, result, status, test_category)
                 elif category == "classes":
-                    test_category = self.find_nested_item_category(key, href)
-                    if test_category is not None and test_category not in ["default", "rules", category]:
-                        self.add_new_title(child, result, status, test_category)
-                    elif child.name != "h3":
+                    if child.name != "h3":
                         self.add_new_title(child, result, status, "class_features")
                     else:
                         status.last_key = key
-                elif status.family:
-                    self.add_new_title(child, result, status, category)
                 else:
                     self.add_new_title(child, result, status)
 
@@ -779,9 +800,9 @@ class SoupKitchen:
             values = []
             if child.name in ['ol', 'ul']:
                 values = child.find_all('li')
-                values = [value.get_text().strip(' ,;') for value in values if value.get_text() is not None]
+                values = [self.clean_text(value.get_text()) for value in values if value.get_text() is not None]
             else:
-                value = child.get_text().strip(' ,;\n\r')
+                value = self.clean_text(child.get_text())
                 if value:
                     url = self.get_href(child)
                     if url:
@@ -829,7 +850,7 @@ class SoupKitchen:
                             result.titles[0][test] = {"name": name, "description": description, "table": table}
                             break
 
-        elif child.name in ["div", "details"]:
+        elif child.name in ["div", "details"] or "rules%" in child.name:
             children = child.children
             next_child = next(children)
             if next:
@@ -842,7 +863,7 @@ class SoupKitchen:
                 if child_name != title_name:
                     self.add_new_title(child, result, status, current_category)
             else:
-                text = child.get_text().strip(' ,;\n\r')
+                text = self.clean_text(child.get_text())
                 if child.name in ["h1", "h2", "h3", "h4"]:
                     text = "<b>" + text + "</b>"
                 if "description" not in result.titles[status.ended].keys():
@@ -870,6 +891,19 @@ class SoupKitchen:
             row_len = max(row_len, len(row))
             table.append(row)
         return table
+
+    @staticmethod
+    def clean_text(raw_string):
+        if raw_string is None:
+            return ''
+        text = raw_string.strip(' ,;\n\r').replace('\xa0', ' ')
+        if text.startswith(']'):
+            if len(text) < 2:
+                return ''
+            text = text[1:]
+        if text.endswith('['):
+            text = text[:-1]
+        return text
 
     @staticmethod
     def format_key(nav_string=None, text=""):

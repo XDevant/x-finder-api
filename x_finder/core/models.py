@@ -23,23 +23,8 @@ class Source(models.Model):
     errata_url = models.URLField(blank=True, null=True)
 
 
-class Language(models.Model):
-    class Rarity(models.TextChoices):
-        COMMON = 'Common'
-        UNCOMMON = 'Uncommon'
-        RARE = 'Rare'
-        SECRET = 'Secret'
-    name = models.CharField(max_length=25)
-    rarity = models.CharField(max_length=10, choices=Rarity.choices)
-    source = models.ForeignKey(
-        to=Source,
-        on_delete=models.PROTECT,
-        related_name='language_source'
-    )
-
-
 class Trait(models.Model):
-    name = models.CharField(max_length=25)
+    name = models.CharField(max_length=25, unique=True)
     subtype = models.CharField(max_length=25)
     nethys_url = models.URLField()
     source = models.ForeignKey(
@@ -49,8 +34,8 @@ class Trait(models.Model):
     )
     source_page = models.IntegerField()
     description = models.TextField()
+    description_links = models.TextField()
 
 
 class Domain(models.Model):
     name = models.CharField(max_length=25)
-
