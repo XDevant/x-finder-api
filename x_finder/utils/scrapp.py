@@ -487,7 +487,7 @@ class SoupKitchen:
                     lambda r: r["level"].split(' ')[0].strip(),
                     axis=1)
             df["level"] = df.apply(
-                lambda r: int(r["level"].split(' ')[-1].strip()) if r["level"].split(' ')[-1].strip().isnumeric() else -1,
+                lambda r: self.numerize_level(r["level"]),
                 axis=1)
         if "description" not in df.columns and "other" in df.columns:
             df.rename(columns={"other": "description"}, inplace=True)
@@ -503,6 +503,24 @@ class SoupKitchen:
             columns['x_finder_related_model'] = "subtype"
         df.rename(columns=columns, inplace=True)
         return df
+
+    @staticmethod
+    def numerize_level(level):
+        if level is None:
+            return 0
+        if isinstance(level, list):
+            level = level[0]
+        if isinstance(level, int):
+            return level
+        level = str(level)
+        if level:
+            level = str(level).split(' ')[-1].strip()
+            if level.isnumeric():
+                return int(level)
+            return -1
+        return 0
+
+
 
     def find_start_ok(self, content, status, result, category, debug=False, verbose=False):
         if content:
@@ -703,6 +721,9 @@ class SoupKitchen:
                             title["prerequisite"].append("Trained in related skill")
 
                     if self.get("nested", current_category):
+                        if current_category in "actions":
+                            if "action" not in title.keys() and "traits" not in title.keys():
+                                continue
                         if current_category not in self.nested_rows.keys():
                             self.nested_rows[current_category] = []
                         self.nested_rows[current_category].append(title)
@@ -712,7 +733,7 @@ class SoupKitchen:
 
         if verbose:
             for title in result.titles:
-                if (title and len(title) > 3 and 'x_finder_model' in title.keys()) or verbose:
+                if (title and len(title) > 3 and 'x_finder_model' in title.keys()) or debug:
                     print(title)
             if result.parsed:
                 print(result.titles[0]["name"], result.parsed)
@@ -754,7 +775,7 @@ class SoupKitchen:
             href = self.get_href(child)
             if key:
                 test_category = self.find_nested_item_category(key, href)
-                if key in self.get("text_columns", category) + self.get("text_columns", current_category):
+                if key in self.get("text_columns", category) + self.get("text_columns", current_category) and not test_category:
                     status.last_key = key
                     status.loaded_values = []
                     if value:
@@ -911,11 +932,14 @@ class SoupKitchen:
             key = nav_string.get_text()
         else:
             key = text
-        key_parts = key.split(':')
+        separator = '('
+        if ':' in key:
+            separator = ':'
+        key_parts = key.split(separator)
         key = key_parts[0].strip(' ,;').lower().replace(' ', '_').replace('-', '_').replace('–', '_')
         value = ""
         if len(key_parts) > 1:
-            value = ":".join(key_parts[1:]).strip(' ,;')
+            value = separator.join(key_parts[1:]).strip(' ,;)')
         return key, value
 
     @staticmethod
