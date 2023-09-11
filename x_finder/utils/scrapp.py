@@ -318,10 +318,11 @@ class SoupKitchen:
         else:
             excluded = self.get("model_excluded_columns", key)
             columns = [column for column in df.columns if column not in excluded]
+
         for column in columns:
-            join = "; "
-            if column == "description":
-                join = " "
+            join = " "
+            if column.endswith("s"):
+                join = "; "
             df[column] = df.apply(
                 lambda r: join.join(r[column]) if isinstance(r[column], list) else r[column],
                 axis=1)
@@ -338,7 +339,7 @@ class SoupKitchen:
             app = self.get("app", key)
             df = pd.DataFrame.from_records(data=dict_of_dicts[key])
             try:
-                df = self.norm_df(df, key)
+                df = self.norm_df(df, key, source_name)
                 normed_category_dfs[key] = df
                 suffix = "normed"
             except Exception:
@@ -474,13 +475,11 @@ class SoupKitchen:
             text = clean_value.get_text()
             return text.strip()
 
-    def norm_df(self, df, key):
+    def norm_df(self, df, key, source_name):
         subtype = self.get("subtype", key)
-        if subtype and "name" in df.columns and subtype not in df.columns:
-            df[subtype] = df.apply(
-                lambda r: r["name"].split('(')[-1].split(')')[0].strip() if '(' in r["name"] else '',
-                axis=1)
-            df["name"] = df.apply(lambda r: r["name"].split('(')[0].strip(), axis=1)
+        name_nest = self.get("name_nest", key)
+        self.split_text_column(df, "name", name_nest, separator='[', strip=' ]')
+        self.split_text_column(df, "name", subtype, separator='(', strip=' )')
         if "level" in df.columns:
             if "spell_type" in self.get("text_columns", key):
                 df["spell_type"] = df.apply(
@@ -489,20 +488,58 @@ class SoupKitchen:
             df["level"] = df.apply(
                 lambda r: self.numerize_level(r["level"]),
                 axis=1)
+        if key == "deities" and "cleric_spells" in df.columns:
+            new_columns = ["first_cleric_spell", "second_cleric_spell_level", "second_cleric_spell",
+                           "third_cleric_spell_level", "third_cleric_spell"]
+            self.split_column(df, "cleric_spells", new_columns, strip=' ')
+            df.rename(columns={"cleric_spells": "first_cleric_spell_level"}, inplace=True)
+
+        if key == "bloodlines" and "granted_spells" in df.columns:
+            new_columns = ["granted_cantrip"] + [f"granted_{i}" for i in range(1, 10)]
+            self.split_column(df, "granted_spells", new_columns, strip=' ', step=2)
+
+        if key == "bloodlines" and "bloodline_spells" in df.columns:
+            new_columns = ["initial_bloodline_spell", "advanced_bloodline_spell", "greater_bloodline_spell"]
+            self.split_column(df, "bloodline_spells", new_columns, strip=' ', step=2)
+
         if "description" not in df.columns and "other" in df.columns:
             df.rename(columns={"other": "description"}, inplace=True)
         if "source" in df.columns and "source_page" not in df.columns:
             df.rename(columns={"source": "sources"}, inplace=True)
+            df["source"] = df.apply(lambda r: [src for src in r["sources"] if source_name in src], axis=1)
             df["source_page"] = df.apply(
-                lambda r: int(r["sources"][-2].split('pg. ')[-1]) if 'pg. ' in r["sources"][-2] else 0,
+                lambda r: int(r["source"][0].split('pg. ')[-1]) if r['source'] and 'pg. ' in r["source"][0] else 0,
                 axis=1)
-            df["source"] = df.apply(lambda r: r["sources"][-2].split('pg. ')[0].strip(), axis=1)
-            df["source_update"] = df.apply(lambda r: r["sources"][-1].strip(), axis=1)
+            df["source"] = df.apply(lambda r: r["source"][0].split('pg. ')[0].strip() if r['source'] else "unknown",
+                                    axis=1)
         columns = {'url': 'nethys_url'}
         if "x_finder_related_model" in df.columns and "subtype" not in df.columns:
             columns['x_finder_related_model'] = "subtype"
         df.rename(columns=columns, inplace=True)
         return df
+
+    @staticmethod
+    def split_column(df, name, new_names, strip=' ', step=1):
+        if name in df.columns and new_names:
+            for i in range(len(new_names)):
+                new_name = new_names[i]
+                df[new_name] = df.apply(
+                    lambda r: r[name][i * step + 1].strip(strip) if r[name] and isinstance(r[name], list) else '',
+                    axis=1)
+            if step == 1:
+                df[name] = df.apply(
+                    lambda r: r[name][0].strip(strip) if r[name] and isinstance(r[name], list) else '',
+                    axis=1)
+
+    @staticmethod
+    def split_text_column(df, name, new_name, separator=' ', strip=' '):
+        if name in df.columns and new_name:
+            df[new_name] = df.apply(
+                    lambda r: r[name].split(separator)[1].strip(strip) if r[name] and separator in r[name] else '',
+                    axis=1)
+            df[name] = df.apply(
+                    lambda r: r[name].split(separator)[0].strip(strip) if r[name] and separator in r[name] else '',
+                    axis=1)
 
     @staticmethod
     def numerize_level(level):
@@ -517,10 +554,9 @@ class SoupKitchen:
             level = str(level).split(' ')[-1].strip()
             if level.isnumeric():
                 return int(level)
-            return -1
+            if level.endswith('+'):
+                return -1
         return 0
-
-
 
     def find_start_ok(self, content, status, result, category, debug=False, verbose=False):
         if content:
@@ -578,6 +614,8 @@ class SoupKitchen:
                 if debug:
                     print(f"found name {name} for {broken_title}")
                 title_end = broken_title.next_sibling
+                if not title_end or title_end.name is None and not title_end.get_text().strip(' '):
+                    title_end = title_end.next_sibling
                 if title_end and title_end.name == "span":
                     text = title_end.get_text().strip(' ,;')
                     if "action" in text:
@@ -727,9 +765,6 @@ class SoupKitchen:
                         if current_category not in self.nested_rows.keys():
                             self.nested_rows[current_category] = []
                         self.nested_rows[current_category].append(title)
-                    else:
-                        if current_category not in self.parsed_rows[0].keys():
-                            self.parsed_rows[0][current_category] = title
 
         if verbose:
             for title in result.titles:
@@ -795,14 +830,25 @@ class SoupKitchen:
         elif child.name and child.name in self.get("cell_starts", current_category):
             key, value = self.format_key(child)
             if key:
-                status.last_key = key.lower()
-                status.loaded_values = []
-                if value:
-                    status.loaded_values.append(value)
-                if key not in self.get("text_columns", category) + self.get("text_columns", current_category):
+                if key in self.get("check_columns", category) and key not in result.titles[0].keys():
+                    result.titles[0][key] = True
+                    if "description" not in result.titles[0].keys():
+                        result.titles[0]["description"] = []
+                    result.titles[0]["description"].append(key)
+                elif key in self.get("check_columns", current_category) and key not in result.titles[status.ended].keys():
+                    result.titles[status.ended][key] = True
+                    if "description" not in result.titles[status.ended].keys():
+                        result.titles[status.ended]["description"] = []
+                    result.titles[status.ended]["description"].append(key)
+                elif key not in self.get("text_columns", category) + self.get("text_columns", current_category):
                     test_category = self.find_nested_item_category(key, self.get_href(child), child.next_sibling)
                     if test_category is not None and test_category not in [category, current_category]:
                         self.add_new_title(child, result, status, category=test_category)
+                else:
+                    status.last_key = key.lower()
+                    status.loaded_values = []
+                    if value:
+                        status.loaded_values.append(value)
 
         elif child.name == 'span':
             link = child.find('a')
