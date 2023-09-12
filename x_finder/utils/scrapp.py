@@ -790,6 +790,7 @@ class SoupKitchen:
         if status.last_key:
             if child.name and child.name in self.get("cell_ends", current_category):
                 self.store(status, result, category, current_category)
+                print(status.last_key, '\n', status.loaded_values)
                 status.last_key = ""
                 status.loaded_values = []
         if status.last_key:
@@ -842,8 +843,13 @@ class SoupKitchen:
                     result.titles[status.ended]["description"].append(key)
                 elif key not in self.get("text_columns", category) + self.get("text_columns", current_category):
                     test_category = self.find_nested_item_category(key, self.get_href(child), child.next_sibling)
-                    if test_category is not None and test_category not in [category, current_category]:
+                    if test_category and test_category not in [category, current_category]:
                         self.add_new_title(child, result, status, category=test_category)
+                    else:
+                        status.last_key = key.lower()
+                        status.loaded_values = []
+                        if value:
+                            status.loaded_values.append(value)
                 else:
                     status.last_key = key.lower()
                     status.loaded_values = []
