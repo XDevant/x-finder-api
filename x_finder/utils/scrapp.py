@@ -313,11 +313,11 @@ class SoupKitchen:
 
     def extract_model_dfs(self, df, key):
         columns = self.get("model_columns", key)
-        if columns:
-            columns = [column for column in columns if column in df.columns]
-        else:
-            excluded = self.get("model_excluded_columns", key)
+        excluded = self.get("model_excluded_columns", key)
+        if excluded:
             columns = [column for column in df.columns if column not in excluded]
+        else:
+            columns = [column for column in columns if column in df.columns]
 
         for column in columns:
             join = " "
@@ -675,6 +675,13 @@ class SoupKitchen:
                     result.titles[status.ended]['action'] = child.find('span').get_text(' ,;')
                 except AttributeError:
                     pass
+            if category == "monster_abilities":
+                subtype = "general"
+                if "ac" in result.titles[0].keys():
+                    subtype = "defensive"
+                if "speed" in result.titles[0].keys():
+                    subtype = "offensive"
+                result.titles[status.ended]["subtype"] = subtype
 
     def find_nested_item_category(self, name, url, next_child=None, category="default"):
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
@@ -799,12 +806,15 @@ class SoupKitchen:
 
         if status.last_key:
             if child.name and child.name in self.get("cell_ends", current_category):
-                self.store(status, result, category, current_category)
-                status.last_key = ""
-                status.loaded_values = []
+                if result.titles[status.ended]["name"] in ["Activate", "Melee", "Ranged"] and not status.loaded_values:
+                    result.titles[status.ended]["name"] = self.clean_text(child.get_text())
+                else:
+                    self.store(status, result, category, current_category)
+                    status.last_key = ""
+                    status.loaded_values = []
         if status.last_key:
             value = self.clean_text(child.get_text())
-            if value:
+            if value and child.name is None or child.name not in self.get("cell_ends", current_category):
                 if status.last_key == "level" and len(value) > 3:
                     values = value.split('. ')
                     value = values[0]
@@ -820,18 +830,24 @@ class SoupKitchen:
             href = self.get_href(child)
             if key:
                 test_category = self.find_nested_item_category(key, href)
-                if key in self.get("text_columns", category) + self.get("text_columns", current_category) and not test_category:
+                check = key in self.get("text_columns", category) + self.get("text_columns", current_category)
+                if check and not test_category == "actions":
                     status.last_key = key
                     status.loaded_values = []
                     if value:
                         status.loaded_values.append(value)
-                elif status.family:
-                    self.add_new_title(child, result, status, category)
                 elif test_category is not None and test_category not in ["default", "rules", category]:
                     self.add_new_title(child, result, status, test_category)
+                elif status.family:
+                    self.add_new_title(child, result, status, category)
                 elif category == "classes":
                     if child.name != "h3":
                         self.add_new_title(child, result, status, "class_features")
+                    else:
+                        status.last_key = key
+                elif category in ["causes", "doctrines", "research_field"]:
+                    if child.name != "h3":
+                        self.add_new_title(child, result, status, "class_optional_features")
                     else:
                         status.last_key = key
                 else:
@@ -906,9 +922,12 @@ class SoupKitchen:
                         value = "<i>" + value + "</i>"
                     values.append(value)
             if values:
-                if "description" not in result.titles[status.ended].keys():
-                    result.titles[status.ended]["description"] = []
-                result.titles[status.ended]["description"] += values
+                index = status.ended
+                if self.get("no_description", current_category):
+                    index = 0
+                if "description" not in result.titles[index].keys():
+                    result.titles[index]["description"] = []
+                result.titles[index]["description"] += values
 
         elif child.name == "table" or child.name == "details" and 'table' in [c.name for c in child.children]:
             key, name, description = [""] * 3
@@ -943,11 +962,19 @@ class SoupKitchen:
                             result.titles[0][test] = {"name": name, "description": description, "table": table}
                             break
 
-        elif child.name in ["div", "details"] or "rules%" in child.name:
+        elif child.name in ["div", "details", "br"] or "rules%" in child.name:
             children = child.children
-            next_child = next(children)
-            if next_child:
-                self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
+            try:
+                next_child = next(children)
+                if next_child:
+                    self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
+            except StopIteration:
+                pass
+
+        elif child.name == "h3" and self.find_nested_item_category(self.format_key(child)[0],
+                                                                   self.get_href(child)
+                                                                   ) == "actions":
+            self.add_new_title(child, result, status, "actions")
 
         elif child.get_text().strip(' ,;'):
             if child.name in ["h1", "h2"] and child.get_text().startswith("Table "):
@@ -965,9 +992,12 @@ class SoupKitchen:
                 if text:
                     if child.name in ["h1", "h2", "h3", "h4"]:
                         text = "<b>" + text + "</b>"
-                    if "description" not in result.titles[status.ended].keys():
-                        result.titles[status.ended]["description"] = []
-                    result.titles[status.ended]["description"].append(text)
+                    index = status.ended
+                    if self.get("no_description", current_category):
+                        index = 0
+                    if "description" not in result.titles[index].keys():
+                        result.titles[index]["description"] = []
+                    result.titles[index]["description"].append(text)
         if child:
             next_child = child.next_sibling
             if next_child:
@@ -995,7 +1025,7 @@ class SoupKitchen:
     def clean_text(raw_string):
         if raw_string is None:
             return ''
-        text = raw_string.strip(' ,;\n\r').replace('\xa0', ' ')
+        text = raw_string.strip(' ,;\n\r—').replace('\xa0', ' ')
         if text.startswith(']'):
             if len(text) < 2:
                 return ''
@@ -1039,7 +1069,7 @@ class SoupKitchen:
         text_cols = self.get("text_columns", category)
         if status.last_key in text_cols or status.last_key.split('_')[0] in text_cols:
             match = True
-            if status.last_key not in result.titles[0].keys() and not status.family:
+            if status.last_key not in result.titles[0].keys() and (not status.family or category != current_category):
                 result.titles[0][status.last_key] = status.loaded_values
                 return
         current_text_cols = self.get("text_columns", current_category)
