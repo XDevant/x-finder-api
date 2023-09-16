@@ -494,6 +494,8 @@ class SoupKitchen:
             self.split_column(df, "cleric_spells", new_columns, strip=' ')
             df.rename(columns={"cleric_spells": "first_cleric_spell_level"}, inplace=True)
 
+        if key == "ancestries":
+
         if key == "backgrounds" and "description_links" in df.columns:
             df["skill"] = df.apply(
                 lambda r: r["description_links"][0].split(": ")[0],
