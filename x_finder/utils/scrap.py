@@ -5,7 +5,7 @@ from os import makedirs
 from time import time, sleep
 from multiprocessing import Pool
 from pathlib import Path
-from x_finder.utils.fixtures.args import item_category_arguments as ica
+from fixtures.args import item_category_arguments as ica
 
 
 item_category_arguments = ica
@@ -28,10 +28,10 @@ def chrono(func):
 
 class SoupKitchen:
     base_url = BASE_URL
-    nav_links = None
-    df = None
-    list_df = None
-    parsed_rows = None
+    nav_links = {}
+    df = pd.DataFrame(data=[], columns=[])
+    list_df = {}
+    parsed_rows = {}
     dfs = []
     completed_dfs = {}
     normed_dfs = {}
@@ -52,7 +52,7 @@ class SoupKitchen:
             return item_category_arguments[category][argument]
         if argument in item_category_arguments["default"].keys():
             return item_category_arguments["default"][argument]
-        return None
+        return ""
 
     @staticmethod
     def save(df, name, directory=None, app="utils"):
@@ -66,9 +66,12 @@ class SoupKitchen:
     def extract_nav_links(self):
         """ If our table is split among sub-tables, we fetch their urls.
         We store their names / urls as key / value pairs in a dict """
-        main = self.raw_soup.find(id="main").span
-        nav_links = main.find_all('a')
-        self.nav_links = {link.get_text(): link['href'] for link in nav_links}
+        raw = self.raw_soup.find(id="main")
+        if raw :
+            main = raw.span
+            if main :
+                nav_links = main.find_all('a')
+                self.nav_links = {link.get_text(): link['href'] for link in nav_links}
         self.clean_nav_links()
 
     def clean_nav_links(self):
@@ -81,6 +84,8 @@ class SoupKitchen:
             return
 
         item_url_col = self.get("item_url_column", category)
+        if not item_url_col:
+            item_url_col = ""
         text_cols = self.get("text_columns", category)
         url_cols = self.get("url_columns", category)
         url_index = self.get_index(headers, item_url_col.lower())
@@ -100,8 +105,12 @@ class SoupKitchen:
 
         if text_cols:
             headers += [self.format_column_name(n) for n in text_cols]
+        else:
+            text_cols= []
         if url_cols:
             headers += [self.format_column_name(n, url=True) for n in url_cols]
+        else:
+            url_cols = []
 
         for row in table_rows:
             item_url = row[-1]
@@ -109,9 +118,9 @@ class SoupKitchen:
                 new_bowl = SoupKitchen(item_url)
                 new_bowl.parse_item_data(category=category)
                 for column in text_cols:
-                    row.append(new_bowl.get_item_data(column))
+                        row.append(new_bowl.get_item_data(column))
                 for column in url_cols:
-                    row.append(new_bowl.get_item_data(column, url=True))
+                        row.append(new_bowl.get_item_data(column, url=True))
             else:
                 row += [None] * len(text_cols + url_cols)
         self.df = pd.DataFrame(data=table_rows, columns=headers)
@@ -252,7 +261,8 @@ class SoupKitchen:
             urls = self.get("url_columns", category)
             item_bowl.parse_item_data(category=category, show=True)
             for header in texts:
-                row[self.format_column_name(header)] = item_bowl.get_item_data(header).strip(";")
+                title = item_bowl.get_item_data(header)
+                row[self.format_column_name(header)] = title.strip(";")
             for header in urls:
                 row[self.format_column_name(header, url=True)] = item_bowl.get_item_data(header, url=True)
             pickup = []
@@ -372,7 +382,10 @@ class SoupKitchen:
         if traits:
             parsed_rows["Traits"] = self.find_traits(raw_data)
         if category in ["spells", "feats", "equipment", "weapons", "armor", "shield"]:
-            parsed_rows["Spell Level"] = self.find_level(raw_data)
+            level = self.find_level(raw_data)
+            if not level:
+                level = "0"
+            parsed_rows["Spell Level"] = level
         self.parsed_rows = parsed_rows
         if show:
             print(self.parsed_rows)
@@ -412,11 +425,13 @@ class SoupKitchen:
             value = BeautifulSoup(self.parsed_rows[header], 'html.parser')
             if value:
                 if url:
-                    try:
-                        url = value.find('a')['href']
-                        return url
-                    except TypeError:
-                        return ""
+                    link = value.find('a')
+                    if link:
+                        try:
+                            url = link['href']
+                            return url
+                        except TypeError:
+                            return ""
                 text = value.get_text()
                 return text.strip()
         return ""
