@@ -43,7 +43,7 @@ class SourceSoup(SoupKitchen):
         self.extract_nav_links()
         self.load_sub_tables()
         self.format_df()
-        self.save(self.df, "sources_normed", app="core")
+        self.save(self.df, "Sources_ready", app="core")
 
 
 class ItemSoup(SoupKitchen):

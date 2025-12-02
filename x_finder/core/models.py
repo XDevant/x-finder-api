@@ -1,6 +1,15 @@
 from django.db import models
 
 
+class Attribute(models.TextChoices):
+    STR = 'Strength'
+    DEX = 'Dexterity'
+    CON = 'Constitution'
+    INT = 'Intelligence'
+    WIS = 'Wisdom'
+    CHA = 'Charisma'
+
+
 class Proficiency(models.TextChoices):
     Untrained = 0
     Trained = 2
@@ -54,6 +63,9 @@ class Skills(models.Model):
         related_name='skill_source'
     )
     source_page = models.PositiveSmallIntegerField()
+    attribute = models.CharField(max_length=3, choices=Attribute.choices)
+    description = models.TextField()
+    description_links = models.TextField()
 
 
 class Feature(models.Model):
