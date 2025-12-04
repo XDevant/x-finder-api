@@ -1,7 +1,9 @@
 
 class Ica:
     @staticmethod
-    def get(ica, argument, category="default"):
+    def get(ica, argument, category="default", keys=False):
+        if keys:
+            return ica.keys()
         if not argument and category in ica.keys():
             return category
         if category in ica.keys() and argument in ica[category].keys():

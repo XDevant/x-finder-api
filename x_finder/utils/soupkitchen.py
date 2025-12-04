@@ -206,12 +206,9 @@ class SoupKitchen:
             if source_name == "unknown":
                 source_name = self.get_source_name(update)
             category_data, no_category_data = U.parse_source_links(item_links)
-
-            new_category_dfs = {}
-            for key, value in no_category_data.items():
-                df = pd.DataFrame.from_records(data=value)
-                new_category_dfs[key] = df
-                U.save(df, f"{key}_raw", directory=source_name)
+            print(category_data)
+            self.save_source_links(category_data, source_name, "ok")
+            self.save_source_links(no_category_data, "ko")
         else:
             category_data = {category: from_df.to_dict('records')}
         if category_filter is not None and isinstance(category_filter, list):
@@ -226,13 +223,17 @@ class SoupKitchen:
                 completed_dfs[key] = completed_nested_dfs[key]
         self.completed_dfs = completed_dfs
 
+    def save_source_links(self, link_dict, source, suffix):
+        for key, value in link_dict.items():
+            df = pd.DataFrame.from_records(data=value)
+            self.H.save(df, f"{key}_links_{suffix}", directory=self.target + '/' + self.edition + '/' + source)
+
     @staticmethod
     def extract_source_links(source_soup, offset):
         if source_soup:
             try:
                 item_list = source_soup.find(id="main").find_all('u')
             except AttributeError:
-                print(source_soup)
                 return []
             try:
                 link_list = [item.a for item in item_list[offset:] if item.a is not None]
@@ -277,12 +278,7 @@ class SoupKitchen:
         missed = []
         count = 0
         for row in data:
-            try:
-                item_bowl = self.H.provider.cook(row["url"])
-            except requests.exceptions.ConnectTimeout:
-                print(f"Connection Timeout for {row}")
-                missed.append(row)
-                continue
+            item_bowl = self.H.provider.cook(url=row["url"])
             result, nested = self.H.parser.parse_item(item_bowl, category=category, debug=debug, verbose=verbose)
 
             check = self.H.get("subtype", category)
@@ -338,10 +334,29 @@ class SoupKitchen:
 if __name__ == "__main__":
     bowl = SoupKitchen("nethys", "remaster")
     print(bowl.H.provider.get("base_url"))
-    test_soup = bowl.H.provider.cook(url="Sources.aspx?ID=216")
-    if test_soup:
+    test_plate = bowl.H.provider.cook("Sources.aspx?ID=216")
+    test_links = bowl.extract_source_links(test_plate["soup"], 0)
+    sorted_links, unknown = U.parse_source_links(test_links)
+    print(sorted_links)
+    bowl.save_source_links(sorted_links, "player_core", "ok")
+    """
+        
+        bowl.load_source_items(test_soup, offset=2, source_name="player_core", debug=True, verbose=True)
+        if items:
+            parsed = bowl.complete_category_items("ancestries", items[5:], limit=3, debug=True, verbose=True)
+            print(parsed)
+        bowl.load_source_items(test_soup, offset=2, source_name="player_core", debug=True, verbose=True)
         test_links = bowl.extract_source_links(test_soup, 0)
         sorted_links, unknown = U.parse_source_links(test_links)
-        weapons = sorted_links["weapons"]
+        weapons = {"weapons": sorted_links["weapons"]}
         if weapons:
             parsed = bowl.complete_category_items("weapons", weapons, limit=2, debug=True, verbose=True)
+        items = [{'name': 'Dwarf', 'url': 'Ancestries.aspx?ID=59'},
+             {'name': 'Elf', 'url': 'Ancestries.aspx?ID=60'},
+             {'name': 'Gnome', 'url': 'Ancestries.aspx?ID=61'},
+             {'name': 'Goblin', 'url': 'Ancestries.aspx?ID=62'},
+             {'name': 'Human', 'url': 'Ancestries.aspx?ID=64'},
+             {'name': 'Halfling', 'url': 'Ancestries.aspx?ID=63'},
+             {'name': 'Leshy', 'url': 'Ancestries.aspx?ID=65'},
+             {'name': 'Orc', 'url': 'Ancestries.aspx?ID=66'}]
+    """

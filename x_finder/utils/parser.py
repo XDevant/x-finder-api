@@ -9,21 +9,24 @@ class Parser:
         self.edition = edition
 
     @staticmethod
-    def get(argument, category="default"):
-        return Ica.get(ica, argument, category)
+    def get(argument, category="default", keys=False):
+        return Ica.get(ica, argument, category, keys)
 
-    def parse_item(self, soup, name="", url="", category="default", debug=False, verbose=False):
+    def parse_item(self, plate, name="", url="", category="default", debug=False, verbose=False):
         """Here we target the last div holding the title and the item content, extract data in the title then move
         to the start of the item content and call the read_soup method to extract the expected key, values.
         To make sure we find the title, ie the item's name and other expected data, we run a first method that
         should work if the data are found within the title tag. If not, the second method will recursively fill the
         missing parts with the text it finds.
         """
-        if soup:
-            main = soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
+        if plate.soup:
+            main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
         else:
             print(f"No soup provided for {category}.")
-            return
+            return {}, {}
+        if not main:
+            print("Main is none")
+            return {}, {}
 
         class Status:
             type = "broken_title"
@@ -48,7 +51,7 @@ class Parser:
         if ok_start is not None:
             self.read_soup(ok_start, status, result, category, debug=debug, verbose=verbose)
         if ok_start is None or status.type == "ok_broken":
-            main = soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
+            main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
             start_broken = self.find_start_broken(main, status, result, category, debug=debug, verbose=verbose)
             if start_broken is not None:
                 self.read_soup(start_broken, status, result, category, debug=debug, verbose=verbose)
@@ -105,6 +108,63 @@ class Parser:
                 print(nested_rows[key])
 
         return parsed_rows, nested_rows
+
+    def find_start(self, plate, status, result, debug=False, verbose=False):
+        title = plate.soup.find('h1')
+        if title is not None and title.get_text():
+            title_content = title.get_text(separator=',').split(',')
+            result.titles.append({"name": title_content[0].strip(' ,;'),
+                                  "x_finder_model": category})
+            if title.a is not None and title.a['href'] is not None:
+                result.titles[0]["url"] = title.a['href']
+                status.type = "ok"
+            if "level" in self.get("text_columns", category):
+                level = title_content[-1].strip(' ,;')
+                if level:
+                    result.titles[0]["level"] = level
+                if level.endswith('+'):
+                    status.family = True
+            if verbose:
+                print(f"Start found for {'family' if status.family else 'item'}: {result.titles[0]['name']}")
+                print(f"on h1: {title}")
+            return title.next_sibling
+        if debug or verbose:
+            print(f"Start not found for h1: {status.name}")
+        status.type = "broken"
+        return None
+
+    def parse_source_links(self, item_list):
+        category_data = {}
+        no_category_data = {}
+        flags = []
+        for item in item_list:
+            name = item.get_text()
+            url = item['href']
+
+            if name:
+                item_dict = {"name": name, "url": url}
+            else:
+                continue
+            if url:
+                snake_item_category = url.split('.')[0]
+                item_category = U.snake_to_under(snake_item_category)
+                if "General=true" in url:
+                    item_category += "_general"
+            else:
+                item_category = "unknown"
+
+            if item_category not in self.get("", keys=True):
+                if item_category not in no_category_data.keys():
+                    no_category_data[item_category] = []
+                no_category_data[item_category].append(item_dict)
+            else:
+                if item_category not in category_data.keys():
+                    category_data[item_category] = []
+                if item_category == "equipment" and item_dict["url"] in flags:
+                    continue
+                flags.append(item_dict["url"])
+                category_data[item_category].append(item_dict)
+        return category_data, no_category_data
 
     def find_start_ok(self, soup, status, result, category, debug=False, verbose=False):
         if soup:
@@ -181,7 +241,7 @@ class Parser:
         else:
             if broken_title is None:
                 if debug or verbose:
-                    print(f"unable to find members of family {result.titles[0]}")
+                    print(f"unable to find members of family {result.titles}")
                 return None
             return self.find_start_broken(broken_title.next_sibling,
                                           status,

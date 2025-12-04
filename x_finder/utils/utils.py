@@ -120,40 +120,6 @@ class U:
             return ""
 
     @staticmethod
-    def parse_source_links(item_list):
-        category_data = {}
-        no_category_data = {}
-        flags = []
-        for item in item_list:
-            name = item.get_text()
-            url = item['href']
-
-            if name:
-                item_dict = {"name": name, "url": url}
-            else:
-                continue
-            if url:
-                snake_item_category = url.split('.')[0]
-                item_category = U.snake_to_under(snake_item_category)
-                if "General=true" in url:
-                    item_category += "_general"
-            else:
-                item_category = "unknown"
-
-            if item_category not in item_category_arguments.keys():
-                if item_category not in no_category_data.keys():
-                    no_category_data[item_category] = []
-                no_category_data[item_category].append(item_dict)
-            else:
-                if item_category not in category_data.keys():
-                    category_data[item_category] = []
-                if item_category == "equipment" and item_dict["url"] in flags:
-                    continue
-                flags.append(item_dict["url"])
-                category_data[item_category].append(item_dict)
-        return category_data, no_category_data
-
-    @staticmethod
     def clean(value):
         clean_value = BeautifulSoup(value, 'html.parser')
         if clean_value:
