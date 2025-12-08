@@ -8,5 +8,5 @@ class RemasterParser(Parser):
         super().__init__("nethys", "remaster")
 
     @staticmethod
-    def get(argument, category="default"):
-        return Ica.get(ica, argument, category)
+    def get(argument, category="default", keys=False):
+        return Ica.get(ica, argument, category, keys)

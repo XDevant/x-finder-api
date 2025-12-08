@@ -16,7 +16,7 @@ class Ica:
 item_category_arguments = {"default": {
     "base_url": "ex: https://2e.aonprd.com/",
     "app": "mostly used to save final csv in the right app/fixture/csv directory or read a csv",
-    "item_url_column": 'the header of the column where we should find the name of the item',
+    "item_url_column": 'the header of the column where we should find the url of the item',
     "text_columns": [],
     "check_columns": ["if one these strings is checked as a potential key, the value is set to true/false, and stored"],
     "url_columns": ["we expect a link around this key and tell the Parser to extract it"],

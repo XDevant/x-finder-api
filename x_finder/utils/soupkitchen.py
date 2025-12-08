@@ -1,6 +1,4 @@
-import requests
 import pandas as pd
-from bs4 import BeautifulSoup
 from time import time, sleep
 from multiprocessing import Pool
 from pathlib import Path
@@ -8,7 +6,6 @@ from utils import U
 from selector import handler_selector
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-Handler = handler_selector("nethys", "remaster")
 
 
 def chrono(func):
@@ -39,10 +36,184 @@ class SoupKitchen:
     def __str__(self):
         return f"Targeting {str(self.target)} {str(self.edition)} "
 
-    def cook(self, url=None):
-        name = url.split('.')[0]
-        if name == self.target:
-            pass
+    def cook_url(self, url, parser=""):
+        """Sends an url to the provider to get a plate with a soup"""
+        plate = self.H.cook_url(url, parser=parser)
+        return plate
+
+    def parse_item(self, plate):
+        """Sends a provided plate to the parser to complete it"""
+        self.H.parse_item(plate)
+
+    def load_source_items(self,
+                          source_plate,
+                          update=False,
+                          offset=3,
+                          from_df=None,
+                          category_filter=None,
+                          source_name="unknown",
+                          category="default",
+                          debug=False,
+                          verbose=False):
+        """
+        :param source_plate: Plate object, a bowl of soup from a completed source page, a dict of item links by category
+        :param update: Bool used as a suffix for filename of csv, used by the commands when loading into db
+        :param offset: Int used to filter the first source_links only in extract_source_links
+        :param from_df: Panda df used to complete a single item category previously saved, bypass extract_source_links
+        :param category_filter: List of categories you want to complete. If None, all categories will be completed
+        :param source_name: String, used with from_df, name of the subdirectory where completed df will be saved
+        :param category: String, base name of the file if from_df is not none
+        :param debug: Bool
+        :param verbose: Bool
+        :return: nothing
+        The base use is to extract from a source a list of links (items) and then extract data from those links.
+        Links encountered will be sorted into different category according to the url found and stored into a dict
+        """
+        if not from_df:
+            item_links = self.extract_source_links(source_plate.soup, offset)
+            if source_name == "unknown":
+                source_name = self.get_source_name(update)
+            category_data, no_category_data = self.H.parser.parse_source_links(item_links)
+            if debug:
+                print(category_data)
+            self.save_source_links(category_data, source_name, "ok")
+            self.save_source_links(no_category_data, source_name, "ko")
+
+        if not from_df:
+            category_data = source_plate.item_list
+        else:
+            category_data = {category: from_df.to_dict('records')}
+        if category_filter is not None and isinstance(category_filter, list):
+            category_data = {key: value for key, value in category_data.items() if key in category_filter}
+        completed_categories, nested_categories = self.complete_all_category_items(category_data,
+                                                                                   debug=debug,
+                                                                                   verbose=verbose)
+        completed_dfs = self.H.build_dfs(completed_categories, source_name=source_name)
+        completed_nested_dfs = self.H.build_dfs(nested_categories, source_name=source_name, suff="nested")
+        for key in completed_nested_dfs.keys():
+            if key not in completed_dfs.keys():
+                completed_dfs[key] = completed_nested_dfs[key]
+        self.completed_dfs = completed_dfs
+
+    def save_source_links(self, link_dict, source, suffix):
+        for key, value in link_dict.items():
+            self.H.build_df(value, source_name=source, category=f"{key}_links_{suffix}")
+
+    @staticmethod
+    def extract_source_links(source_soup, offset):
+        if source_soup:
+            try:
+                item_list = source_soup.find(id="main").find_all('u')
+            except AttributeError:
+                return []
+            try:
+                link_list = [item.a for item in item_list[offset:] if item.a is not None]
+                return link_list
+            except IndexError:
+                print(item_list)
+        print("No soup found, did you cook it?")
+        return []
+
+    @staticmethod
+    def get_source_name(source_soup, update=False):
+        if source_soup:
+            try:
+                name = source_soup.find(id="main").find(class_="title").a.get_text()
+            except TypeError:
+                name = "Unknown"
+            if update:
+                name += "_update"
+            return name
+        print("No soup found, did you cook it?")
+        return ""
+
+    def complete_all_category_items(self, category_dict, debug=False, verbose=False):
+        """
+        :param category_dict: { "category_a": [{"item_name": String, "url": String}, ...], ...}
+        :param debug: Bool
+        :param verbose: Bool
+        :return: category_dict, category_dict { "category_a": [{complete_item_dict of strings}, ...], ...}
+        """
+        result_dict = {}
+        nested_dict = {}
+        for key, value in category_dict.items():
+            result_dict[key], partial_nested = self.complete_category_items(key,
+                                                                            value,
+                                                                            debug=debug,
+                                                                            verbose=verbose)
+            for nested_category in partial_nested.keys():
+                if nested_category not in nested_dict.keys():
+                    nested_dict[nested_category] = []
+                nested_dict[nested_category] += partial_nested[nested_category]
+        return result_dict, nested_dict
+
+    @chrono
+    def complete_category_items(self, category, data, limit=20, debug=False, verbose=False):
+        """
+        :param category: String, in ica.keys()
+        :param data: [{ "name": String, "url": String}]
+        :param limit: Int, if debug is True, will only complete the first 20 rows by default
+        :param debug: Bool
+        :param verbose: Bool, more prints
+        :return: list of dict (item[category]=category), list if dicts (item[category]!=category)
+        """
+        results = []
+        nesteds = {}
+        missed = []
+        count = 0
+        for row in data:
+            item_plate = self.H.provider.cook(url=row["url"])
+
+            result, nested = self.H.parser.parse_item(item_plate, category=category, debug=debug, verbose=verbose)
+
+            check = self.H.get("subtype", category)
+            if result and result[0]["name"] in row["name"] and check and "subtype" not in result[0].keys():
+                result[0]["name"] = row["name"]
+            results += result
+            for key in nested.keys():
+                if key not in nesteds.keys():
+                    nesteds[key] = []
+                nesteds[key] += nested[key]
+            count += 1
+            if debug and count == limit:
+                break
+        print(f"Extracted {len(results)}/{count} items")
+        return results, nesteds
+
+    def get_item_data(self, parsed_row, header, url=False):
+        """Here we use the missing columns' headers given to the constructor to fetch
+        the missing item data in the row we just parsed.
+        Args:
+            parsed_row  : Dict
+            header      : String
+            url         : Bool
+        Return String
+        """
+        if parsed_row and header and header in parsed_row.keys():
+            value = self.H.provider.cook_from_html(parsed_row[header])  # overkill and bugged
+            if value:
+                if url:
+                    try:
+                        url = value.find('a')['href']
+                        return url
+                    except TypeError:
+                        return ""
+                text = value.get_text()
+                return text.strip()
+        return ""
+
+    def extract_value(self, value, url=False):
+        if value:
+            value = self.H.provider.cook_from_html(value)
+            if url:
+                try:
+                    url = value.find('a')['href']
+                    return url
+                except TypeError:
+                    return ""
+            text = value.get_text()
+            return text.strip()
+        return ""
 
     def extract_nav_links(self, nav_soup):
         """ If our table is split among sub-tables, we fetch their urls.
@@ -53,8 +224,10 @@ class SoupKitchen:
             nav_links = {link.get_text(): link['href'] for link in nav_link_list}
             self.clean_nav_links(nav_links)
             print(f"{len(nav_links)} navigation links extracted.")
+            return nav_links
         else:
             print("No soup found, did you cook it?")
+        return {}
 
     @staticmethod
     def clean_nav_links(nav_links):
@@ -178,168 +351,16 @@ class SoupKitchen:
             print(parsed_row)
         return parsed_row
 
-    def load_source_items(self,
-                          source_soup,
-                          update=False,
-                          offset=3,
-                          from_df=None,
-                          category_filter=None,
-                          source_name="unknown",
-                          category="default",
-                          debug=False,
-                          verbose=False):
-        """ The base use is to extract from a source a list of links (items) and then extract data from those links.
-        Links encountered will be sorted into different category according to the url found and stored into a dict
-        :param source_soup: NavigableString
-        :param update: Bool used as a suffix for filename of csv, used by the commands when loading into db
-        :param offset: Int used to filter the first source_links only in extract_source_links
-        :param from_df: Panda df used to complete a single item category previously saved, bypass extract_source_links
-        :param category_filter: List of categories you want to complete. If None, all categories will be completed
-        :param source_name: String, used with from_df, name of the subdirectory where completed df will be saved
-        :param category: String, base name of the file if from_df is not none
-        :param debug: Bool
-        :param verbose: Bool
-        :return: nothing
-        """
-        if not from_df:
-            item_links = self.extract_source_links(source_soup, offset)
-            if source_name == "unknown":
-                source_name = self.get_source_name(update)
-            category_data, no_category_data = U.parse_source_links(item_links)
-            print(category_data)
-            self.save_source_links(category_data, source_name, "ok")
-            self.save_source_links(no_category_data, "ko")
-        else:
-            category_data = {category: from_df.to_dict('records')}
-        if category_filter is not None and isinstance(category_filter, list):
-            category_data = {key: value for key, value in category_data.items() if key in category_filter}
-        completed_categories, nested_categories = self.complete_all_category_items(category_data,
-                                                                                   debug=debug,
-                                                                                   verbose=verbose)
-        completed_dfs = self.H.build_dfs(completed_categories, source_name=source_name)
-        completed_nested_dfs = self.H.build_dfs(nested_categories, source_name=source_name, suff="nested")
-        for key in completed_nested_dfs.keys():
-            if key not in completed_dfs.keys():
-                completed_dfs[key] = completed_nested_dfs[key]
-        self.completed_dfs = completed_dfs
-
-    def save_source_links(self, link_dict, source, suffix):
-        for key, value in link_dict.items():
-            df = pd.DataFrame.from_records(data=value)
-            self.H.save(df, f"{key}_links_{suffix}", directory=self.target + '/' + self.edition + '/' + source)
-
-    @staticmethod
-    def extract_source_links(source_soup, offset):
-        if source_soup:
-            try:
-                item_list = source_soup.find(id="main").find_all('u')
-            except AttributeError:
-                return []
-            try:
-                link_list = [item.a for item in item_list[offset:] if item.a is not None]
-                return link_list
-            except IndexError:
-                print(item_list)
-        print("No soup found, did you cook it?")
-        return []
-
-    @staticmethod
-    def get_source_name(source_soup, update=False):
-        if source_soup:
-            try:
-                name = source_soup.find(id="main").find(class_="title").a.get_text()
-            except TypeError:
-                name = "Unknown"
-            if update:
-                name += "_update"
-            return name
-        print("No soup found, did you cook it?")
-        return ""
-
-    def complete_all_category_items(self, category_dict, debug=False, verbose=False):
-        result_dict = {}
-        nested_dict = {}
-        for key, value in category_dict.items():
-            result_dict[key], partial_nested = self.complete_category_items(key,
-                                                                            value,
-                                                                            debug=debug,
-                                                                            verbose=verbose)
-            for nested_category in partial_nested.keys():
-                if nested_category not in nested_dict.keys():
-                    nested_dict[nested_category] = []
-                nested_dict[nested_category] += partial_nested[nested_category]
-        return result_dict, nested_dict
-
-    @chrono
-    def complete_category_items(self, category, data, limit=20, debug=False, verbose=False):
-        """"""
-        results = []
-        nesteds = {}
-        missed = []
-        count = 0
-        for row in data:
-            item_bowl = self.H.provider.cook(url=row["url"])
-            result, nested = self.H.parser.parse_item(item_bowl, category=category, debug=debug, verbose=verbose)
-
-            check = self.H.get("subtype", category)
-            if result and result[0]["name"] in row["name"] and check and "subtype" not in result[0].keys():
-                result[0]["name"] = row["name"]
-            results += result
-            for key in nested.keys():
-                if key not in nesteds.keys():
-                    nesteds[key] = []
-                nesteds[key] += nested[key]
-            count += 1
-            if debug and count == limit:
-                break
-        print(f"Extracted {len(results)}/{count} items")
-        return results, nesteds
-
-    def get_item_data(self, parsed_row, header, url=False):
-        """Here we use the missing columns' headers given to the constructor to fetch
-        the missing item data in the row we just parsed.
-        Args:
-            parsed_row  : Dict
-            header      : String
-            url         : Bool
-        Return String
-        """
-        if parsed_row and header and header in parsed_row.keys():
-            value = self.H.cook(parsed_row[header])
-            if value:
-                if url:
-                    try:
-                        url = value.find('a')['href']
-                        return url
-                    except TypeError:
-                        return ""
-                text = value.get_text()
-                return text.strip()
-        return ""
-
-    def extract_value(self, value, url=False):
-        if value:
-            value = BeautifulSoup(value, self.parser)
-            if url:
-                try:
-                    url = value.find('a')['href']
-                    return url
-                except TypeError:
-                    return ""
-            text = value.get_text()
-            return text.strip()
-        return ""
-
 
 if __name__ == "__main__":
     bowl = SoupKitchen("nethys", "remaster")
     print(bowl.H.provider.get("base_url"))
+    """
     test_plate = bowl.H.provider.cook("Sources.aspx?ID=216")
-    test_links = bowl.extract_source_links(test_plate["soup"], 0)
-    sorted_links, unknown = U.parse_source_links(test_links)
+    test_links = bowl.extract_source_links(test_plate.soup, 0)
+    sorted_links, unknown = bowl.H.parser.parse_source_links(test_links)
     print(sorted_links)
     bowl.save_source_links(sorted_links, "player_core", "ok")
-    """
         
         bowl.load_source_items(test_soup, offset=2, source_name="player_core", debug=True, verbose=True)
         if items:

@@ -3,7 +3,6 @@ from args import Ica, item_category_arguments as ica
 
 
 class Parser:
-
     def __init__(self, target, edition):
         self.target = target
         self.edition = edition
@@ -11,6 +10,23 @@ class Parser:
     @staticmethod
     def get(argument, category="default", keys=False):
         return Ica.get(ica, argument, category, keys)
+
+    def validate_plate(self, plate):
+        main_id = self.get("main_id")
+        detail_title = self.get("detail_title")
+        if plate.soup:
+            main = plate.soup.find(id=main_id)
+            if main:
+                title = main.find(detail_title)
+                if title:
+                    plate.validated = True
+            else:
+                print("Main is none for {plate.name} in category {plate.category}")
+        else:
+            print(f"No soup provided for {plate.name} in category {plate.category}.")
+
+    def complete_plate(self, plate):
+        return plate
 
     def parse_item(self, plate, name="", url="", category="default", debug=False, verbose=False):
         """Here we target the last div holding the title and the item content, extract data in the title then move

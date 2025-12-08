@@ -2,6 +2,8 @@
 item_category_arguments = {
     "default": {"base_url": "https://2e.aonprd.com/",
                 "app": "utils",
+                "main_id": "ctl00_RadDrawer1_Content_MainContent_DetailedOutput",
+                "item_title": "h1",
                 "row_start": "a",
                 "cell_starts": ["b"],
                 "cell_ends": ['b', 'br', 'hr', 'h1', 'h2', 'h3', 'table'],

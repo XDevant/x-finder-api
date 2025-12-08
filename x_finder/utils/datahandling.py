@@ -42,27 +42,37 @@ class Dh:
         print(f"{name} successfully saved at {path}.")
 
     @staticmethod
-    def load(name, app="utils", directory=None, suffix="raw"):
+    def load(name, app="utils", directory=None, suffix=""):
         if directory:
-            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{directory}\\{name}_{suffix}.csv"
+            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{directory}\\{name}{'_' if suffix else ''}{suffix}.csv"
         else:
-            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}{suffix}.csv"
+            pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}{'_' if suffix else ''}{suffix}.csv"
         df = pd.read_csv(pathfile, delimiter="|")
         return df
 
-    def build_dfs(self, dict_of_dicts, source_name="Unknown", suff=""):
+    def load_df(self, category, source="", suffix="", app="utils"):
+        directory = self.target + "/" + self.edition
+        if source:
+            directory += "/" + source
+        df = self.load(category, app=app, directory=directory, suffix=suffix)
+        return df
+
+    def build_dfs(self, dict_of_lists_of_dicts, source_name="Unknown", suffix=""):
         completed_category_dfs = {}
-        for key in dict_of_dicts.keys():
-            df = pd.DataFrame.from_records(data=dict_of_dicts[key])
+        for key in dict_of_lists_of_dicts.keys():
+            list_of_dicts = dict_of_lists_of_dicts[key]
+            df = self.build_df(list_of_dicts, source_name=source_name, category=key, suffix=suffix)
             completed_category_dfs[key] = df
-            suffix = "completed"
-            if suff:
-                suffix += "_" + suff
-            directory = self.target + "/" + self.edition + "/" + source_name
-            self.save(df, f"{key}_{suffix}", directory=directory, app="utils")
         return completed_category_dfs
 
-    def norm_dfs(self, dict_of_dfs, source_name):
+    def build_df(self, list_of_dicts, source_name="Unknown", category="unknown", suffix=""):
+        df = pd.DataFrame.from_records(data=list_of_dicts)
+        suffix = f"{category}_completed + {'_' if suffix else ''} + {suffix}"
+        directory = self.target + "/" + self.edition + "/" + source_name
+        self.save(df, suffix, directory=directory, app="utils")
+        return df
+
+    def finalize_completed_dfs(self, dict_of_dfs, source_name):
         normed_category_dfs = {}
         finalized_category_dfs = {}
         missed_category_dfs = {}
@@ -84,6 +94,16 @@ class Dh:
                     self.save(model_df, f"{key}_finalized", directory=source_name, app=app)
                 except Exception:
                     print(f"An error occurred while finalizing {key} df")
+
+    def parse_item(self, plate):
+        self.parser.validate_plate(plate)
+        if plate.validated:
+            self.parser.parse_item(plate)
+            self.parser.complete_plate(plate)
+
+    def cook_url(self, url, parser=""):
+        plate = self.provider.cook(url, parser=parser)
+        return plate
 
     def find_nested_item_category(self, name, url, next_child=None, category="default"):
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
