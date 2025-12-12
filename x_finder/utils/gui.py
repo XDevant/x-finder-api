@@ -38,7 +38,7 @@ class GUI:
     sql_entry.grid(row=29, column=12, sticky=EW)
 
     def __init__(self):
-        self.inbox_entry.bind('<Return>', self.load_target_input)
+        self.inbox_entry.bind('<Return>', self.load_inbox_input)
         self.initialize_labels()
         self.initialize_listboxes()
         self.initialize_buttons()
@@ -54,13 +54,15 @@ class GUI:
                          text='',
                          bg='lightCyan2',
                          rowspan=1,
+                         columnspan=1,
                          sticky='EW',
                          width=None):
         if name:
             if not text:
                 text = f"{name}".capitalize().replace('_lb', '')
             self.__setattr__(name, Label(self.mw, text=text, bg=bg, width=width))
-            self.__getattribute__(name).grid(row=row, column=column, sticky=sticky, rowspan=rowspan)
+            self.__getattribute__(name).grid(row=row, column=column, sticky=sticky,
+                                             rowspan=rowspan, columnspan=columnspan)
 
     def update_label(self, label, text):
         self.__getattribute__(label).config(text=text)
@@ -105,7 +107,7 @@ class GUI:
         self.initialize_button("clear_main_bt", command=self.clear_message_box, row=30, column=3, text="Clear Box")
         self.initialize_button("load_csv_bt", command=self.load_csv_in_db(), row=30, column=5, text="Load csv into db")
         self.initialize_button("export_csv_bt", command=self.export_as_csv(), row=30, column=7, text="Save as csv")
-        self.initialize_button("send_sql_bt", command=self.text_input, row=30, column=12, text="Send Request")
+        self.initialize_button("send_sql_bt", command=self.sql_input, row=30, column=12, text="Send Request")
 
     def initialize_labels(self):
         self.initialize_label("target_lb", row=0, column=1)
@@ -124,7 +126,7 @@ class GUI:
 
         self.initialize_label("query_name_lb", row=14, column=3, text="Item Name")
         self.initialize_label("query_url_lb", row=14, column=5, text="Item Url")
-        self.initialize_label("query_lb", row=14, column=7, text="Item data")
+        self.initialize_label("query_lb", row=14, column=7, text="Item data", columnspan=4)
         self.initialize_label("table_lb", row=0, column=9)
         self.initialize_label("sql_lb", row=28, column=12, text='SQlite query:')
 
@@ -147,25 +149,23 @@ class GUI:
         self.initialize_label("space_8", text=' ', row=0, column=11, rowspan=22, sticky='NS')
         self.initialize_label("space_4", text=' ', row=0, column=6, rowspan=11, sticky='NS')
 
-    def update_labels_and_buttons(self, category=False):
-        if category:
-            pass
-        else:
-            self.update_label("current_url_lb", f"Url: {self.current_url if self.current_url else '-'}")
-            self.update_label("current_source_lb", f"Source: {self.current_source if self.current_source else '-'}")
-            self.update_label("current_category_lb",
-                              f"Category: {self.current_category if self.current_category else '-'}")
-            self.update_label("current_item_lb", f"Item: {self.current_item if self.current_item else '-'}")
+    def update_current_labels(self):
+        self.update_label("current_url_lb", f"Url: {self.current_url if self.current_url else '-'}")
+        self.update_label("current_source_lb", f"Source: {self.current_source if self.current_source else '-'}")
+        self.update_label("current_category_lb", f"Category: {self.current_category if self.current_category else '-'}")
+        self.update_label("current_item_lb", f"Item: {self.current_item if self.current_item else '-'}")
+
+    def update_current_buttons(self, category=False):
+        """Overload in kitchen_gui"""
+        pass
 
     def initialize_path(self, target=None, edition=None):
         if not self.path:
             self.path = self.base_path
         if target:
-            print("called with target")
             self.target = target
             self.path += target + '/'
         if not self.target:
-            print("called without target")
             self.build_path("target")
 
         if edition:
@@ -203,7 +203,7 @@ class GUI:
         except FileNotFoundError:
             return []
 
-    def text_input(self):
+    def sql_input(self):
         try:
             sql = self.sql_entry.get()
             con = lite.connect(self.db)
@@ -310,11 +310,6 @@ class GUI:
             name = self.__getattribute__("source_list").get(index)
             url = self.__getattribute__("source_url_list").get(index)
             self.select_source(name, url)
-            self.update_label("current_url_lb", f"Url: {self.current_url if self.current_url else '-'}")
-            self.update_label("current_source_lb", f"Source: {self.current_source if self.current_source else '-'}")
-            self.update_label("current_category_lb",
-                              f"Category: {self.current_category if self.current_category else '-'}")
-            self.update_label("current_item_lb", f"Item: {self.current_item if self.current_item else '-'}")
         if list_box_name == "category_list":
             self.select_category()
         if list_box_name in ["query_url_list", "query_name_list"]:
@@ -322,8 +317,7 @@ class GUI:
             url = self.__getattribute__("query_url_list").get(index)
             self.current_url = url
             self.current_item = name
-            self.update_label("current_url_lb", f"Url: {self.current_url}")
-            self.update_label("current_item_lb", f"Item: {self.current_item}")
+        self.update_current_labels()
 
     @staticmethod
     def read_csv_by_line(path_name):
@@ -332,11 +326,19 @@ class GUI:
                 lines = file.readlines()
                 return lines
 
-    def load_target_input(self, event):
+    def load_inbox_input(self, event):
         new_input = self.inbox_entry.get()
         inputs = new_input.split(' ')
-        if len(inputs) < 1:
+        if len(inputs) == 0:
             self.__getattribute__("message_box").insert(END, f'-- No Input command --')
+            return
+        command = inputs[0]
+        arg_list = []
+        kwarg_dict = {}
+        try:
+            self.__getattribute__(command)(*arg_list, **kwarg_dict)
+        except AttributeError:
+            self.__getattribute__("message_box").insert(END, f'-- Wrong Input command --')
 
     def select_source(self, name, url):
         try:
@@ -368,16 +370,13 @@ class GUI:
         self.display_sources()
 
     def select_category(self):
-        self.clear_message_box()
         try:
             file = self.__getattribute__("category_list").selection_get()
             name = file.split('.')[0]
             name = name.split('_')[0]
             pathfile = self.path + self.current_source + '/' + file
             df = pd.read_csv(pathfile, sep='|')
-            self.__getattribute__("query_list").delete(0, 'end')
-            self.__getattribute__("query_name_list").delete(0, 'end')
-            self.__getattribute__("query_url_list").delete(0, 'end')
+            self.clear_query_lists()
             for item in df.iterrows():
                 row_list = list(item[1])
                 self.__getattribute__("query_name_list").insert(END, row_list[0])
@@ -386,14 +385,17 @@ class GUI:
                     self.__getattribute__("query_list").insert(END, ' | '.join(row_list[2:]))
             if self.current_source != self.current_item and name != self.current_category:
                 self.current_item = ""
-                self.update_label("current_item_lb", "Item: -")
             self.current_category = name
-            self.update_label("current_category_lb", f"Category: {name}")
         except FileNotFoundError:
             self.__getattribute__("message_box").insert(END, '-- No category extracted for that source --')
         except AttributeError:
             self.__getattribute__("message_box").insert(END, '-- Source not found! --')
         self.__getattribute__("category_list").selection_clear(0, 'end')
+
+    def clear_query_lists(self):
+        self.__getattribute__("query_list").delete(0, 'end')
+        self.__getattribute__("query_name_list").delete(0, 'end')
+        self.__getattribute__("query_url_list").delete(0, 'end')
 
     def select_table(self):
         try:

@@ -1,15 +1,64 @@
 import pandas as pd
 from os import makedirs
 from pathlib import Path
-from args import Ica, item_category_arguments as ica
+import json
+from args import Ica
 from provider import Provider
 from parser import Parser
 from normalizer import Normalizer
 from modeler import Modeler
+from nethys.remaster.args import item_category_arguments
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 """Df is not supposed to do much but provide base methods and hooks for each handler that will inherit from Df """
+
+
+class Plate:
+    """
+    Class designed to store the data relative to its url until complete parsing.
+    Given to the Provider and Parser for completion. Returned to the kitchen.
+    Kitchen method dealing with a single plate return it to the GUI while methods iterating lists store the result
+    in panda dataframes and csv or db. All forget the plate once exited.
+    The GUI only stores the last Plate it received.
+    """
+
+    def __init__(self, url=None, title=None, content=None, soup=None):
+        self.url = url
+        self.title = title
+        self.content = content
+        self.soup = soup
+        self.name = "unknown"
+        self.category = "default"
+        self.item_links = {}
+        self.data_dict = {}
+        self.validated = False
+        self.completed = False
+
+
+class Status:
+    """
+    Keep track of the parsing steps, given as argument to recursive method read_node to keep it sane
+    """
+    def __init__(self, known_name, known_url):
+        self.name = known_name
+        self.url = known_url
+        self.ended = 0  # number of titles, to fill the right dict
+        self.last_key = ""  # we parsed a key and are loading values if truthy,
+        self.loaded_values = []  # values can be in many html nodes we stack, waiting for end or key identification
+        self.family = False  # we expect nested items of the same category in this page
+        self.start = None  # first node after item's title in soup Navigable string
+
+
+class Result:
+    """
+    Stores parsing results,  given as argument to and filled by recursive method read_node to keep it sane
+    """
+    def __init__(self):
+        self.parsed = []
+        self.titles = []
+        self.links = []
+        self.tails = []
 
 
 class Dh:
@@ -17,20 +66,43 @@ class Dh:
      then we build a panda dataframe for each category of items and normalize them for data tidying
      and make sure our dfs match our database models and extract tables through.
      """
-    target = ""
-    edition = ""
+    provider = None
+    parser = None
+    normalizer = None
+    modeler = None
 
     def __init__(self, target="", edition=""):
         self.target = target
         self.edition = edition
-        self.provider = Provider(target, edition)
-        self.parser = Parser(target, edition)
-        self.normalizer = Normalizer(target, edition)
-        self.modeler = Modeler(target, edition)
+        self.ica = None
+        self.instantiate_provider()
+        self.instantiate_parser()
+        self.instantiate_normalizer()
+        self.instantiate_modeler()
+        self.dispatch_ica()
 
-    @staticmethod
-    def get(argument, category="default", keys=False):
-        return Ica.get(ica, argument, category, keys)
+    def instantiate_provider(self):
+        self.provider = Provider(self.target, self.edition)
+
+    def instantiate_parser(self):
+        self.parser = Parser(self.target, self.edition)
+
+    def instantiate_normalizer(self):
+        self.normalizer = Normalizer(self.target, self.edition)
+
+    def instantiate_modeler(self):
+        self.modeler = Modeler(self.target, self.edition)
+
+    def dispatch_ica(self):
+        with open(f"{BASE_DIR}\\utils\\{self.target}\\{self.edition}\\args.json") as file:
+            self.ica = json.load(file)
+        self.provider.ica = self.ica
+        self.parser.ica = self.ica
+        self.normalizer.ica = self.ica
+        self.modeler.ica = self.ica
+
+    def get(self, argument, category="default", keys=False):
+        return Ica.get(self.ica, argument, category, keys)
 
     @staticmethod
     def save(df, name, directory=None, app="utils"):
@@ -95,14 +167,33 @@ class Dh:
                 except Exception:
                     print(f"An error occurred while finalizing {key} df")
 
-    def parse_item(self, plate):
-        self.parser.validate_plate(plate)
-        if plate.validated:
-            self.parser.parse_item(plate)
-            self.parser.complete_plate(plate)
+    def extract_source_links(self, plate):
+        unsorted_links = self.parser.extract_source_links(plate.soup)
+        link_dict = self.parser.parse_source_links(unsorted_links)
+        plate.item_links = link_dict
 
-    def cook_url(self, url, parser=""):
-        plate = self.provider.cook(url, parser=parser)
+    def parse_item(self, plate, debug=False, verbose=False):
+        plate.validated = self.parser.validate_plate(plate)
+        if plate.validated:
+            status = Status(plate.name, plate.url)
+            result = Result()
+            title = self.parser.find_start(plate, status, debug=False, verbose=False)
+            result.titles.append(title)
+            print("result title", *result.titles, status.start is not None)
+            if status.start and title:
+                parsed_rows = self.parser.parse_item(plate, status=status, result=result,
+                                                     debug=debug, verbose=verbose)
+                items = self.parser.complete_plate(plate, parsed_rows)
+                plate.data_dict = items
+                if items:
+                    plate.completed = True
+            else:
+                print(f"title = {title}, start is {'none' if status.start is None else 'not none'}")
+
+    def cook_url(self, url, parser="", keep_alive=False):
+        plate = Plate(url=url)
+        print(plate.data_dict)
+        self.provider.cook(plate, parser=parser, keep_alive=keep_alive)
         return plate
 
     def find_nested_item_category(self, name, url, next_child=None, category="default"):
@@ -138,3 +229,9 @@ class Dh:
         if name_model != "default":
             return name_model
         return ""
+
+
+if __name__ == "__main__":
+    with open(f"{BASE_DIR}\\utils\\nethys\\remaster\\args.json") as f:
+        ica = json.load(f)
+        print(ica)

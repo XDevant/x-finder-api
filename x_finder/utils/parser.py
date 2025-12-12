@@ -1,15 +1,15 @@
 from utils import U
-from args import Ica, item_category_arguments as ica
+from args import Ica
 
 
 class Parser:
     def __init__(self, target, edition):
         self.target = target
         self.edition = edition
+        self.ica = None
 
-    @staticmethod
-    def get(argument, category="default", keys=False):
-        return Ica.get(ica, argument, category, keys)
+    def get(self, argument, category="default", keys=False):
+        return Ica.get(self.ica, argument, category, keys)
 
     def validate_plate(self, plate):
         main_id = self.get("main_id")
@@ -19,92 +19,70 @@ class Parser:
             if main:
                 title = main.find(detail_title)
                 if title:
-                    plate.validated = True
+                    return True
             else:
                 print("Main is none for {plate.name} in category {plate.category}")
         else:
             print(f"No soup provided for {plate.name} in category {plate.category}.")
+        return False
 
-    def complete_plate(self, plate):
-        return plate
+    def complete_plate(self, plate, parsed_rows):
+        """
+         Missing keys in item dicts will be nan soon. This hook is the right place to add a default value
+         for some items missing data.
+         parsed rows : {category: [{item_key: item_data, ...}, ...]
+         """
+        if "actions" not in parsed_rows.keys():
+            return parsed_rows
+        if plate.category != "skills_general" and plate.category != "skills_general":
+            return parsed_rows
+        action_list = parsed_rows["actions"]
+        plate_item = parsed_rows[plate.category][0]
+        name = self.clean_name(plate_item["name"])
+        trained = False
+        if "(Trained)" in plate_item["name"]:
+            trained = True
+        for action in action_list:
+            if " Trained Actions" in action["name"]:
+                trained = True
+            if trained and plate.category == "skills" or plate.category == "skills_general":
+                if "prerequisite" not in action.keys():
+                    action["prerequisite"] = []
+                if plate.category == "skills":
+                    action["prerequisite"].append(f"Trained in {name}")
+                else:
+                    action["prerequisite"].append("Trained in related skill")
+        return parsed_rows
 
-    def parse_item(self, plate, name="", url="", category="default", debug=False, verbose=False):
+    def parse_item(self, plate, status=None, result=None, debug=False, verbose=False):
         """Here we target the last div holding the title and the item content, extract data in the title then move
         to the start of the item content and call the read_soup method to extract the expected key, values.
         To make sure we find the title, ie the item's name and other expected data, we run a first method that
         should work if the data are found within the title tag. If not, the second method will recursively fill the
         missing parts with the text it finds.
         """
-        if plate.soup:
-            main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
-        else:
-            print(f"No soup provided for {category}.")
-            return {}, {}
-        if not main:
-            print("Main is none")
-            return {}, {}
-
-        class Status:
-            type = "broken_title"
-            family = False
-            ended = 0
-            last_key = ""
-            loaded_values = []
-
-            def __init__(self, known_name, known_url):
-                self.name = known_name
-                self.url = known_url
-
-        class Result:
-            parsed = []
-            titles = []
-            links = []
-            tails = []
-
-        status = Status(name, url)
-        result = Result()
-        ok_start = self.find_start_ok(main, status, result, category, debug=debug, verbose=verbose)
-        if ok_start is not None:
-            self.read_soup(ok_start, status, result, category, debug=debug, verbose=verbose)
-        if ok_start is None or status.type == "ok_broken":
-            main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
-            start_broken = self.find_start_broken(main, status, result, category, debug=debug, verbose=verbose)
-            if start_broken is not None:
-                self.read_soup(start_broken, status, result, category, debug=debug, verbose=verbose)
+        if status.start is not None:
+            self.read_soup(status.start, status, result, plate.category, debug=debug, verbose=verbose)
 
         parsed_rows = []
         nested_rows = {}
-        trained = False
-        if category == "skills_general" and "(Trained)" in result.titles[0]["name"]:
-            trained = True
+        discarded = []
         for title in result.titles:
-            if " Trained Actions" in title["name"]:
-                trained = True
             if title and len(title) > 3 and 'x_finder_model' in title.keys():
                 current_category = title['x_finder_model']
-                if current_category == category:
-                    if 'level' in result.titles[0].keys() and 'level' not in title.keys():
-                        print(f"{title} should have a level and is discarded")
-                        continue
-                    parsed_rows.append(title)
+                if current_category == plate.category:
+                    check = self.validate_title(title, result)
+                    if check:
+                        parsed_rows.append(title)
+                    else:
+                        discarded.append(title)
                 else:
-                    related_item = result.titles[0]["name"].split('(')[0].strip()
+                    base_item_name = result.titles[0]["name"]
+                    related_item = self.clean_name(base_item_name)
                     title["x_finder_related_item"] = related_item
-                    title["x_finder_related_model"] = category
-                    check_1 = current_category == "actions" and trained
-                    check_2 = category == "skills" or category == "skills_general"
-                    if check_1 and check_2:
-                        if "prerequisite" not in title.keys():
-                            title["prerequisite"] = []
-                        if category == "skills":
-                            title["prerequisite"].append(f"Trained in {related_item}")
-                        else:
-                            title["prerequisite"].append("Trained in related skill")
+                    title["x_finder_related_model"] = plate.category
 
-                    if self.get("nested", current_category):
-                        if current_category in "actions":
-                            if "action" not in title.keys() and "traits" not in title.keys():
-                                continue
+                    if self.get("nested", current_category) and self.validate_nested_title(title, current_category):
                         if current_category not in nested_rows.keys():
                             nested_rows[current_category] = []
                         nested_rows[current_category].append(title)
@@ -114,40 +92,96 @@ class Parser:
                 if (title and len(title) > 3 and 'x_finder_model' in title.keys()) or debug:
                     print(title)
             if result.parsed:
+                print("Parsed title")
                 print(result.titles[0]["name"], result.parsed)
             if result.tails:
+                print("tails")
                 print(result.titles[0]["name"], result.tails)
         if debug or verbose:
             for title in parsed_rows:
+                print(f"{plate.category} Items:")
                 print(title)
             for key in nested_rows.keys():
+                print("Nested item categories")
                 print(nested_rows[key])
+        nested_rows[plate.category] = parsed_rows
+        return nested_rows
 
-        return parsed_rows, nested_rows
+    @staticmethod
+    def clean_name(name):
+        return name.split('(')[0].strip()
 
-    def find_start(self, plate, status, result, debug=False, verbose=False):
-        title = plate.soup.find('h1')
-        if title is not None and title.get_text():
+    @staticmethod
+    def validate_title(title, result):
+        if 'level' in result.titles[0].keys() and 'level' not in title.keys():
+            print(f"{title} should have a level and is discarded")
+            return False
+        return True
+
+    @staticmethod
+    def validate_nested_title(title, category):
+        if category in "actions":
+            if "action" not in title.keys() and "traits" not in title.keys():
+                return False
+        return True
+
+    def find_start(self, plate, status, debug=False, verbose=False):
+        title_dict = {"plate_name": plate.name,
+                      "x_finder_model": plate.category}
+        main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
+        titles = main.find_all('h1')
+        if titles is None:
+            titles = main.find_all('h1')
+        if titles is None:
+            return None
+        for title in titles:
+            if not title.get_text():
+                continue
             title_content = title.get_text(separator=',').split(',')
-            result.titles.append({"name": title_content[0].strip(' ,;'),
-                                  "x_finder_model": category})
-            if title.a is not None and title.a['href'] is not None:
-                result.titles[0]["url"] = title.a['href']
-                status.type = "ok"
-            if "level" in self.get("text_columns", category):
+            title_dict["name"] = title_content[0].strip(' ,;')
+
+            if len(title_content) > 2:
+                text = title_content[1].strip(' ,;')
+                if "action" in text:
+                    title_dict['action'] = text
+
+            if "level" in self.get("text_columns", plate.category) and len(title_content) > 1:
                 level = title_content[-1].strip(' ,;')
                 if level:
-                    result.titles[0]["level"] = level
+                    title_dict["level"] = level
                 if level.endswith('+'):
                     status.family = True
+
+            title_links = title.find_all('a')
+            if not title_links:
+                continue
+            title_links = [link for link in title_links if link['href']]
+            for link in title_links:
+                title_dict["url"] = link['href']
+                status.start = title.next_sibling
             if verbose:
-                print(f"Start found for {'family' if status.family else 'item'}: {result.titles[0]['name']}")
+                print(f"Start found for {'family' if status.family else 'item'}: {title_dict['name']}")
                 print(f"on h1: {title}")
-            return title.next_sibling
+            return title_dict
         if debug or verbose:
             print(f"Start not found for h1: {status.name}")
-        status.type = "broken"
-        return None
+        status.start = None
+        return title_dict
+
+    @staticmethod
+    def extract_source_links(source_soup):
+        if source_soup:
+            try:
+                item_list = source_soup.find(id="main").find_all('u')
+            except AttributeError:
+                return []
+            try:
+                link_list = [item.a for item in item_list if item.a is not None]
+                return link_list
+            except IndexError:
+                print(item_list)
+        print("No soup found, did you cook it?")
+        return []
 
     def parse_source_links(self, item_list):
         category_data = {}
@@ -181,90 +215,6 @@ class Parser:
                 flags.append(item_dict["url"])
                 category_data[item_category].append(item_dict)
         return category_data, no_category_data
-
-    def find_start_ok(self, soup, status, result, category, debug=False, verbose=False):
-        if soup:
-            title = soup.find('h1')
-            if title is not None and title.get_text():
-                title_content = title.get_text(separator=',').split(',')
-                result.titles.append({"name": title_content[0].strip(' ,;'),
-                                      "x_finder_model": category})
-                if title.a is not None and title.a['href'] is not None:
-                    result.titles[0]["url"] = title.a['href']
-                    status.type = "ok"
-                else:
-                    result.titles[0]["url"] = status.url
-                    status.type = "ok_broken"
-                if "level" in self.get("text_columns", category):
-                    level = title_content[-1].strip(' ,;')
-                    if level:
-                        result.titles[0]["level"] = level
-                    if level.endswith('+'):
-                        status.family = True
-                if verbose:
-                    print(f"Start found for {'family' if status.family else 'item'}: {result.titles[0]['name']}")
-                    print(f"on h1: {title}")
-                return title.next_sibling
-        if debug or verbose:
-            print(f"Start not found for h1: {status.name}")
-        status.type = "broken"
-        return None
-
-    def find_start_broken(self, content, status, result, category, debug=False, verbose=False):
-        """
-        """
-        broken_title = content
-        if broken_title is not None and broken_title.name in [None, 'a']:
-            url = status.url
-            if broken_title.name == 'a':
-                status.type = "broken_title"
-                name = broken_title.get_text().strip(' ,;')
-                url = broken_title["href"]
-            elif broken_title.name is None and len(broken_title) > 2:
-                status.type = "broken_link"
-                name = str(broken_title).strip(' ,;')
-            else:
-                return self.find_start_broken(broken_title.next_sibling,
-                                              status,
-                                              result,
-                                              category,
-                                              debug=debug,
-                                              verbose=verbose)
-            if name:
-                result.titles.append({"name": name,
-                                      "url": url,
-                                      "x_finder_model": category})
-                status.ended = len(result.titles) - 1
-                if debug:
-                    print(f"found name {name} for {broken_title}")
-                title_end = broken_title.next_sibling
-                if not title_end or title_end.name is None and not title_end.get_text().strip(' '):
-                    title_end = title_end.next_sibling
-                if title_end and title_end.name == "span":
-                    text = title_end.get_text().strip(' ,;')
-                    if "action" in text:
-                        result.titles[status.ended]['action'] = text
-                        title_end = title_end.next_sibling
-                    if title_end and title_end.name == "span" and 'level' in self.get("text_columns", category):
-                        level = title_end.get_text().strip(' ,;')
-                        result.titles[status.ended]['level'] = level
-                        if level.endswith('+'):
-                            status.family = True
-                            if verbose:
-                                print(f"Secondary title: {result.titles[status.ended]} found for {result.titles[0]}")
-                        return title_end.next_sibling
-                return title_end
-        else:
-            if broken_title is None:
-                if debug or verbose:
-                    print(f"unable to find members of family {result.titles}")
-                return None
-            return self.find_start_broken(broken_title.next_sibling,
-                                          status,
-                                          result,
-                                          category,
-                                          debug=debug,
-                                          verbose=verbose)
 
     def add_new_title(self, child, result, status, category=None, name=None):
         """
@@ -407,6 +357,7 @@ class Parser:
                     self.add_new_title(child, result, status)
 
         elif child.name and child.name in self.get("cell_starts", current_category):
+            print("cell start")
             key, value = U.format_key(child)
             if key:
                 check_text = key in self.get("text_columns", category) + self.get("text_columns", current_category)
@@ -440,6 +391,7 @@ class Parser:
                         status.loaded_values.append(value)
 
         elif child.name == 'span':
+            print("span")
             if "class" in child.attrs:
                 check = False
                 for trait in ["trait", "traituncommon", "traitrare", "traitunique"]:

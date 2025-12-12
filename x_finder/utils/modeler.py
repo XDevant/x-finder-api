@@ -1,14 +1,14 @@
-from args import Ica, item_category_arguments as ica
+from args import Ica
 
 
 class Modeler:
     def __init__(self, target, edition):
         self.target = target
         self.edition = edition
+        self.ica = None
 
-    @staticmethod
-    def get(argument, category="default"):
-        return Ica.get(ica, argument, category)
+    def get(self, argument, category="default", keys=False):
+        return Ica.get(self.ica, argument, category)
 
     def extract_model_dfs(self, df, key):
         columns = self.get("model_columns", key)

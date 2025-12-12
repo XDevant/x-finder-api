@@ -92,7 +92,7 @@ class U:
     @staticmethod
     def format_key(nav_string=None, text=""):
         if nav_string is not None:
-            key = nav_string.get_text()
+            key = nav_string.get_text().strip(':')
         else:
             key = text
         separator = '('
@@ -102,7 +102,7 @@ class U:
         key = key_parts[0].strip(' ,;').lower().replace(' ', '_').replace('-', '_').replace('–', '_')
         value = ""
         if len(key_parts) > 1:
-            value = separator.join(key_parts[1:]).strip(' ,;)')
+            value = separator.join(key_parts[1:]).strip('( ,;)')
         return key, value
 
     @staticmethod
