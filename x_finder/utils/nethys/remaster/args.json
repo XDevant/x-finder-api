@@ -1,9 +1,14 @@
 {
   "default": {
     "base_url": "https://2e.aonprd.com/",
+    "index_url": "Sources.aspx",
+    "start_date": 2023,
     "app": "utils",
+    "nav_id": "ctl00_RadDrawer1_Content_MainContent_Navigation",
     "main_id": "ctl00_RadDrawer1_Content_MainContent_DetailedOutput",
+    "search_id": "results",
     "item_title": "h1",
+    "search_title": "table",
     "row_start": "a",
     "cell_starts": ["b"],
     "cell_ends": ["b", "br", "hr", "h1", "h2", "h3", "table"],

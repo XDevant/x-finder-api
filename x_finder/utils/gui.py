@@ -1,43 +1,44 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from tkinter import *
+from tkinter import Tk, Label, Listbox, Entry, NS, EW, END, Button, Scrollbar, VERTICAL, TclError, Event
 import sqlite3 as lite
 import os
 import pandas as pd
-
-test_name = 'test.csv'
+from x_finder.x_finder.settings import BASE_DIR
+from typing import Callable
 
 
 class GUI:
-    mw = Tk()
-    mw.title("Soup Kitchen")
-    inbox_lb = Label(mw, text='Enter target,edition', bg='lightCyan2')
-    inbox_entry = Entry(mw, width=30)
 
-    base_path = "fixtures/csv/"
-    target = ""
-    edition = ""
-    path = ""
-    loaded_sources = {}
-    current_source = ""
-    current_url = ""
-    current_category = ""
-    current_item = ""
-    db = None
+    def __init__(self) -> None:
+        self.mw = Tk()
+        self.mw.title("Soup Kitchen")
+        self.target = ""
+        self.edition = ""
+        self.current_source = ""
+        self.current_url = ""
+        self.current_category = ""
+        self.current_item = ""
+        self.loaded_sources: list[dict | None] = []
+        self.db = None
 
-    inbox_lb.grid(row=7, column=12, sticky=EW)
-    inbox_entry.grid(row=8, column=12, sticky=EW)
+        self.inbox_lb = Label(self.mw, text='Enter target,edition', bg='lightCyan2')
+        self.inbox_entry = Entry(self.mw, width=30)
 
-    new_csv_lb = Label(mw, text='name next .csv to be created', bg='lightCyan2')
-    new_csv_entry = Entry(mw, width=30)
-    new_csv_entry.insert(END, 'my_new_csv')
-    new_csv_lb.grid(row=16, column=12, sticky=EW)
-    new_csv_entry.grid(row=17, column=12, sticky=EW)
-    sql_entry = Entry(mw, width=30)
-    sql_entry.grid(row=29, column=12, sticky=EW)
+        self.inbox_lb.grid(row=7, column=12, sticky=EW)
+        self.inbox_entry.grid(row=8, column=12, sticky=EW)
 
-    def __init__(self):
+        self.new_csv_lb = Label(self.mw, text='name next .csv to be created', bg='lightCyan2')
+        self.new_csv_entry = Entry(self.mw, width=30)
+        self.new_csv_entry.insert(END, 'my_new_csv')
+        self.new_csv_lb.grid(row=16, column=12, sticky=EW)
+        self.new_csv_entry.grid(row=17, column=12, sticky=EW)
+        self.sql_entry = Entry(self.mw, width=30)
+        self.sql_entry.grid(row=29, column=12, sticky=EW)
+
+        self.path = f"{BASE_DIR}\\utils\\fixtures\\csv\\"
+        print(self.path)
         self.inbox_entry.bind('<Return>', self.load_inbox_input)
         self.initialize_labels()
         self.initialize_listboxes()
@@ -48,15 +49,15 @@ class GUI:
         self.initialize_path()
 
     def initialize_label(self,
-                         name,
-                         row=0,
-                         column=0,
-                         text='',
-                         bg='lightCyan2',
-                         rowspan=1,
-                         columnspan=1,
-                         sticky='EW',
-                         width=None):
+                         name: str,
+                         row: int = 0,
+                         column: int = 0,
+                         text: str = '',
+                         bg: str = 'lightCyan2',
+                         rowspan: int = 1,
+                         columnspan: int = 1,
+                         sticky: str = 'EW',
+                         width: int | None = None) -> None:
         if name:
             if not text:
                 text = f"{name}".capitalize().replace('_lb', '')
@@ -64,16 +65,16 @@ class GUI:
             self.__getattribute__(name).grid(row=row, column=column, sticky=sticky,
                                              rowspan=rowspan, columnspan=columnspan)
 
-    def update_label(self, label, text):
+    def update_label(self, label: str, text: str) -> None:
         self.__getattribute__(label).config(text=text)
 
     def initialize_button(self,
-                          name,
-                          command=None,
-                          row=0,
-                          column=0,
-                          text='',
-                          bg='khaki2'):
+                          name: str,
+                          command: Callable[[], None] = None,
+                          row: int = 0,
+                          column: int = 0,
+                          text: str = '',
+                          bg: str = 'khaki2') -> None:
         if name:
             if not text:
                 text = name.capitalize().replace('_bt', '')
@@ -81,16 +82,19 @@ class GUI:
             self.__setattr__(name, Button(self.mw, text=text, bg=bg, command=command))
             self.__getattribute__(name).grid(row=row, column=column)
 
+    def update_button(self, button: str, color: str = 'grey') -> None:
+        self.__getattribute__(button + "_bt").config(bg=color)
+
     def initialize_listbox(self,
-                           name,
-                           height=4,
-                           width=30,
-                           selectmode='single',
-                           row=0,
-                           column=0,
-                           rowspan=10,
-                           columnspan=1,
-                           scrollbar=True):
+                           name: str | None,
+                           height: int = 4,
+                           width: int = 30,
+                           selectmode: str = 'single',
+                           row: int = 0,
+                           column: int = 0,
+                           rowspan: int = 10,
+                           columnspan: int = 1,
+                           scrollbar: bool = True) -> None:
         self.__setattr__(name, Listbox(self.mw, height=height, width=width, selectmode=selectmode))
         self.__getattribute__(name).grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan)
         self.__setattr__(f"scroll_v_{name}",
@@ -103,13 +107,13 @@ class GUI:
                                                            rowspan=rowspan,
                                                            sticky=NS)
 
-    def initialize_buttons(self):
-        self.initialize_button("clear_main_bt", command=self.clear_message_box, row=30, column=3, text="Clear Box")
-        self.initialize_button("load_csv_bt", command=self.load_csv_in_db(), row=30, column=5, text="Load csv into db")
-        self.initialize_button("export_csv_bt", command=self.export_as_csv(), row=30, column=7, text="Save as csv")
+    def initialize_buttons(self) -> None:
+        self.initialize_button("clear_main_bt", command=self.clear_message_box, row=30, column=1, text="Clear Box")
+        self.initialize_button("load_csv_bt", command=self.load_csv_in_db(), row=30, column=3, text="Load csv into db")
+        self.initialize_button("export_csv_bt", command=self.export_as_csv(), row=30, column=5, text="Save as csv")
         self.initialize_button("send_sql_bt", command=self.sql_input, row=30, column=12, text="Send Request")
 
-    def initialize_labels(self):
+    def initialize_labels(self) -> None:
         self.initialize_label("target_lb", row=0, column=1)
         self.initialize_label("edition_lb", row=1, column=1)
         self.initialize_label("url_lb", row=2, column=1, text=" ")
@@ -130,7 +134,7 @@ class GUI:
         self.initialize_label("table_lb", row=0, column=9)
         self.initialize_label("sql_lb", row=28, column=12, text='SQlite query:')
 
-    def initialize_listboxes(self):
+    def initialize_listboxes(self) -> None:
         self.initialize_listbox("file_list", height=4, row=3, column=1, rowspan=3, scrollbar=False)
         self.initialize_listbox("source_list", height=10, width=15, row=1, column=3, rowspan=10)
         self.initialize_listbox("source_url_list", height=10, width=15, row=1, column=5, rowspan=10, scrollbar=False)
@@ -143,34 +147,32 @@ class GUI:
                                 scrollbar=False)
         self.initialize_listbox("message_box", height=5, row=1, column=12, rowspan=5, scrollbar=False)
 
-    def initialize_vertical_spacing(self):
+    def initialize_vertical_spacing(self) -> None:
         self.initialize_label("space_0", text=' ', row=0, column=0, rowspan=22, sticky='NS')
         self.initialize_label("space_2", text=' ', row=0, column=2, rowspan=22, sticky='NS')
         self.initialize_label("space_8", text=' ', row=0, column=11, rowspan=22, sticky='NS')
         self.initialize_label("space_4", text=' ', row=0, column=6, rowspan=11, sticky='NS')
 
-    def update_current_labels(self):
+    def update_current_labels(self) -> None:
         self.update_label("current_url_lb", f"Url: {self.current_url if self.current_url else '-'}")
         self.update_label("current_source_lb", f"Source: {self.current_source if self.current_source else '-'}")
         self.update_label("current_category_lb", f"Category: {self.current_category if self.current_category else '-'}")
         self.update_label("current_item_lb", f"Item: {self.current_item if self.current_item else '-'}")
 
-    def update_current_buttons(self, category=False):
+    def update_current_buttons(self) -> None:
         """Overload in kitchen_gui"""
         pass
 
-    def initialize_path(self, target=None, edition=None):
-        if not self.path:
-            self.path = self.base_path
+    def initialize_path(self, target: str | None = None, edition: str | None = None) -> None:
         if target:
             self.target = target
-            self.path += target + '/'
+            self.path += target + '\\'
         if not self.target:
             self.build_path("target")
 
         if edition:
             self.edition = edition
-            self.path += edition + '/'
+            self.path += edition + '\\'
         if not self.edition:
             self.build_path("edition")
         if self.target:
@@ -178,32 +180,32 @@ class GUI:
         if self.edition:
             self.update_label("edition_lb", f'Edition: {self.edition}')
 
-    def build_path(self, stage):
+    def build_path(self, stage: str) -> None:
         csv_directories = self.get_directories()
         if len(csv_directories) == 1:
             name = csv_directories[0]
             self.__setattr__(stage, name)
-            self.path += name + '/'
+            self.path += name + '\\'
             self.__getattribute__("message_box").insert(END, f'-- Found {stage} {name} --')
         elif len(csv_directories) == 0:
             self.__getattribute__("message_box").insert(END, '-- No target found, create one --')
         else:
             self.display_edition()
 
-    def build_directories(self, path_tail=None):
-        csv_directories = self.get_directories(path_tail=path_tail)
+    def build_directories(self) -> None:
+        csv_directories = self.get_directories()
         self.__getattribute__("file_list").delete(0, 'end')
         for directory in csv_directories:
             self.__getattribute__("file_list").insert(END, str(directory))
 
-    def get_directories(self, path_tail=None):
+    def get_directories(self) -> list:
         try:
             with os.scandir(self.path) as it:
                 return [entry.name for entry in it if entry.is_dir()]
         except FileNotFoundError:
             return []
 
-    def sql_input(self):
+    def sql_input(self) -> None:
         try:
             sql = self.sql_entry.get()
             con = lite.connect(self.db)
@@ -222,10 +224,10 @@ class GUI:
         except TclError:
             self.__getattribute__("message_box").insert(END, 'TclError: check current DB')
 
-    def clear_message_box(self):
+    def clear_message_box(self) -> None:
         self.__getattribute__("message_box").delete(0, 'end')
 
-    def display_csv(self):
+    def display_csv(self) -> None:
         self.__getattribute__("table_list").delete(0, 'end')
         try:
             with os.scandir(self.path) as it:
@@ -238,7 +240,7 @@ class GUI:
                     if '.csv' in entry.name and entry.is_file():
                         self.__getattribute__("table_list").insert(END, entry.name)
 
-    def display_db(self):
+    def display_db(self) -> None:
         self.__getattribute__("source_list").delete(0, 'end')
         try:
             with os.scandir(self.path) as it:
@@ -251,7 +253,7 @@ class GUI:
                     if '.sqlite' in entry.name and entry.is_file():
                         self.__getattribute__("source_list").insert(END, entry.name)
 
-    def display_table(self):
+    def display_table(self) -> None:
         if self.db:
             con = lite.connect(self.db)
             with con:
@@ -266,11 +268,10 @@ class GUI:
                 for row in rows:
                     self.__getattribute__("table_list").insert(END, row)
 
-    def load_csv_in_db(self):
+    def load_csv_in_db(self) -> None:
         try:
             file = self.__getattribute__("category_list").selection_get()
-            pathfile = self.path + file
-            df = pd.read_csv(pathfile)
+            df = self.load_csv(file)
             name = file[:-4]
             con = lite.connect(self.db)
             with con:
@@ -282,7 +283,13 @@ class GUI:
             self.__getattribute__("message_box").insert(END, '--Select a .csv to load--')
         self.display_table()
 
-    def export_as_csv(self):
+    def load_csv(self, file_name: str) -> pd.DataFrame:
+        pathfile = self.path + file_name
+        print(pathfile)
+        df = pd.read_csv(pathfile, sep='|')
+        return df
+
+    def export_as_csv(self) -> None:
         if not self.db:
             return
         con = lite.connect(self.db)
@@ -298,7 +305,7 @@ class GUI:
         df.to_csv(name, index=False)
         self.display_csv()
 
-    def on_select(self, event, list_box_name):
+    def on_select(self, event: Event, list_box_name: str) -> None:
         w = event.widget
         try:
             index = int(w.curselection()[0])
@@ -318,15 +325,16 @@ class GUI:
             self.current_url = url
             self.current_item = name
         self.update_current_labels()
+        self.update_current_buttons()
 
     @staticmethod
-    def read_csv_by_line(path_name):
+    def read_csv_by_line(path_name) -> list[str]:
         if path_name.endswith('.csv'):
             with open(path_name, 'r') as file:
                 lines = file.readlines()
                 return lines
 
-    def load_inbox_input(self, event):
+    def load_inbox_input(self, event: Event) -> None:
         new_input = self.inbox_entry.get()
         inputs = new_input.split(' ')
         if len(inputs) == 0:
@@ -340,7 +348,7 @@ class GUI:
         except AttributeError:
             self.__getattribute__("message_box").insert(END, f'-- Wrong Input command --')
 
-    def select_source(self, name, url):
+    def select_source(self, name: str, url: str) -> None:
         try:
             folder = name.lower().replace(' ', '_')
             path_to_folder = f"{self.path}{folder}{'/' if folder else ''}"
@@ -357,7 +365,7 @@ class GUI:
         except FileNotFoundError:
             self.__getattribute__("message_box").insert(END, f'-- No category folder --')
 
-    def select_edition(self):
+    def select_edition(self) -> None:
         selection = self.__getattribute__("file_list").selection_get()
         if self.edition or not selection:
             pass
@@ -369,11 +377,11 @@ class GUI:
         self.display_edition()
         self.display_sources()
 
-    def select_category(self):
+    def select_category(self) -> None:
         try:
             file = self.__getattribute__("category_list").selection_get()
             name = file.split('.')[0]
-            name = name.split('_')[0]
+            name = name.split('__')[0]
             pathfile = self.path + self.current_source + '/' + file
             df = pd.read_csv(pathfile, sep='|')
             self.clear_query_lists()
@@ -382,7 +390,8 @@ class GUI:
                 self.__getattribute__("query_name_list").insert(END, row_list[0])
                 self.__getattribute__("query_url_list").insert(END, row_list[1])
                 if len(row_list) >= 2:
-                    self.__getattribute__("query_list").insert(END, ' | '.join(row_list[2:]))
+                    cleared_list = [str(row) for row in row_list[2:]]
+                    self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
             if self.current_source != self.current_item and name != self.current_category:
                 self.current_item = ""
             self.current_category = name
@@ -392,12 +401,12 @@ class GUI:
             self.__getattribute__("message_box").insert(END, '-- Source not found! --')
         self.__getattribute__("category_list").selection_clear(0, 'end')
 
-    def clear_query_lists(self):
+    def clear_query_lists(self) -> None:
         self.__getattribute__("query_list").delete(0, 'end')
         self.__getattribute__("query_name_list").delete(0, 'end')
         self.__getattribute__("query_url_list").delete(0, 'end')
 
-    def select_table(self):
+    def select_table(self) -> None:
         try:
             table = self.__getattribute__("table_list").selection_get()
             if table:
@@ -407,7 +416,7 @@ class GUI:
         self.__getattribute__("table_list").selection_clear(0, 'end')
         self.display_table()
 
-    def display_category(self):
+    def display_category(self) -> None:
         self.__getattribute__("category_list").delete(0, 'end')
         folder = self.current_source
         if folder and not self.path.endswith('csv/'):
@@ -419,7 +428,7 @@ class GUI:
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, '--No category csv found--')
 
-    def display_sources_from_folder(self):
+    def display_sources_from_folder(self) -> None:
         if not self.path.endswith('csv/'):
             try:
                 with os.scandir(self.path) as it:
@@ -429,7 +438,7 @@ class GUI:
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, '-- No source folder found --')
 
-    def display_sources_from_csv(self):
+    def display_sources_from_csv(self) -> None:
         loaded = 0
         missed = 0
         for source in self.loaded_sources:
@@ -441,7 +450,7 @@ class GUI:
                 missed += 1
         self.__getattribute__("message_box").insert(END, f'-- Loaded {loaded}/{loaded + missed} sources --')
 
-    def display_sources(self):
+    def display_sources(self) -> None:
         self.__getattribute__("source_list").delete(0, 'end')
         if not self.edition:
             pass
@@ -450,7 +459,7 @@ class GUI:
         else:
             self.display_sources_from_folder()
 
-    def display_edition(self):
+    def display_edition(self) -> None:
         if not self.edition:
             self.build_directories()
         else:
@@ -465,7 +474,7 @@ class GUI:
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, '--No source csv nor db found--')
 
-    def load_sources(self):
+    def load_sources(self) -> None:
         source_list = []
         keys = []
         lines = self.read_csv_by_line(f"{self.path}/sources.csv")
@@ -479,9 +488,11 @@ class GUI:
                 source_list.append(source_dict)
         self.loaded_sources = source_list
 
-    def run(self):
+    def run(self) -> None:
         self.display_edition()
         self.display_sources()
+        self.display_category()
+        self.update_current_buttons()
         self.mw.mainloop()
 
 

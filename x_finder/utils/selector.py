@@ -1,8 +1,9 @@
 from nethys.remaster.handler import RemasterDh
 from nethys.legacy.handler import LegacyDh
+from datahandling import Dh
 
 
-def handler_selector(target, edition):
+def handler_selector(target: str, edition: str) -> Dh:
     if target == 'nethys' and edition == 'remaster':
         return RemasterDh()
     if target == 'nethys' and edition == 'legacy':
