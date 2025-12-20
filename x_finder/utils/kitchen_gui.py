@@ -1,3 +1,4 @@
+import pandas as pd
 from gui import GUI
 from soupkitchen import SoupKitchen as Kitchen
 from tkinter import messagebox, END
@@ -12,6 +13,7 @@ class KitchenGraphic(GUI):
         self.base_url: str | None = None
         self.current_plate: Plate | None = None
         self.initialize_command_buttons()
+        self.initialize_plate_labels()
 
     def load_target_input(self, event: Event) -> None:
         super().load_inbox_input(event)
@@ -32,44 +34,58 @@ class KitchenGraphic(GUI):
 
     def initialize_command_buttons(self) -> None:
         self.initialize_button("extract_sources_bt", command=self.extract_sources,
-                               row=12, column=1, text=" Extract Sources ", bg='grey')
+                               row=12, column=1, text=" Extract Sources ", bg='grey', default='disabled')
         self.initialize_button("cook_url_bt", command=self.cook_url,
-                               row=13, column=1, text=" Cook  Url ", bg='grey')
+                               row=13, column=1, text=" Cook  Url ", bg='grey', default='disabled')
         self.initialize_button("parse_item_bt", command=self.parse_item,
-                               row=14, column=1, text="Parse Item", bg='grey')
+                               row=14, column=1, text="Parse Item", bg='grey', default='disabled')
         self.initialize_button("parse_category_bt", command=self.parse_category,
-                               row=15, column=1, text="Parse category", bg='grey')
-        self.initialize_button("normalize_category_bt", command=self.normalize_category(),
-                               row=16, column=1, text="Normalize Category", bg='grey')
+                               row=15, column=1, text="Parse category", bg='grey', default='disabled')
+        self.initialize_button("normalize_category_bt", command=self.normalize_category,
+                               row=16, column=1, text="Normalize Category", bg='grey', default='disabled')
         self.initialize_button("fit_category_to_model_bt", command=self.fit_category_to_model,
-                               row=17, column=1, text="Fit category to Model", bg='grey')
+                               row=17, column=1, text="Fit category to Model", bg='grey', default='disabled')
         self.initialize_button("parse_source_bt", command=self.parse_source,
-                               row=18, column=1, text="Parse Source", bg='grey')
+                               row=18, column=1, text="Parse Source", bg='grey', default='disabled')
         self.initialize_button("normalize_source_bt", command=self.normalize_source,
-                               row=19, column=1, text="Normalize Source", bg='grey')
-        self.initialize_button("fit_source_to_models_bt", command=self.fit_source_to_models(),
-                               row=20, column=1, text="Fit source to model", bg='grey')
-        self.initialize_button("update_provider_bt", command=self.update_provider(),
-                               row=30, column=7, text="Update Provider", bg='grey')
-        self.initialize_button("update_parser_bt", command=self.update_parser(),
-                               row=30, column=8, text="Update Parser", bg='grey')
-        self.initialize_button("update_normalizer_bt", command=self.update_normalizer(),
-                               row=30, column=9, text="Update Parser", bg='grey')
-        self.initialize_button("update_modeler_bt", command=self.update_modeler(),
-                               row=30, column=10, text="Update Modeler", bg='grey')
+                               row=19, column=1, text="Normalize Source", bg='grey', default='disabled')
+        self.initialize_button("fit_source_to_models_bt", command=self.fit_source_to_models,
+                               row=20, column=1, text="Fit source to model", bg='grey', default='disabled')
+        self.initialize_button("sort_sources_bt", command=self.sort_sources(),
+                               row=21, column=1, text="Sort Sources", bg='grey', default='disabled')
+        self.initialize_button("update_provider_bt", command=self.update_provider,
+                               row=30, column=7, text="Update Provider", bg='grey', default='disabled')
+        self.initialize_button("update_parser_bt", command=self.update_parser,
+                               row=30, column=8, text="Update Parser", bg='grey', default='disabled')
+        self.initialize_button("update_normalizer_bt", command=self.update_normalizer,
+                               row=30, column=10, text="Update Parser", bg='grey', default='disabled')
+        self.initialize_button("update_modeler_bt", command=self.update_modeler,
+                               row=30, column=11, text="Update Modeler", bg='grey', default='disabled')
+
+    def initialize_plate_labels(self) -> None:
+        self.initialize_label("plate_lb", row=9, column=14)
+        self.initialize_label("plate_name_lb", row=10, column=14)
+        self.initialize_label("plate_url_lb", row=11, column=14)
+        self.initialize_label("plate_category_lb", row=12, column=14)
+        self.initialize_label("plate_status_lb", row=13, column=14)
 
     def update_current_buttons(self) -> None:
         super(KitchenGraphic, self).update_current_buttons()
         if self.current_url:
-            self.update_button("cook_url", "green")
+            self.update_button("cook_url", color="green", default='normal')
+        else:
+            self.update_button("cook_url", color='grey', default='disabled')
         if self.current_plate:
-            self.update_button("parse_item", "green")
+            if self.current_plate.soup and self.current_plate.name == self.current_item.lower().replace(' ', '_'):
+                self.update_button("parse_item", color="green", default='normal')
+            else:
+                self.update_button("parse_item", color='grey', default='disabled')
             if self.current_category:
-                self.update_button("parse_category", "green")
+                self.update_button("parse_category", color="green", default='normal')
                 if self.current_plate.dfs and self.current_category in self.current_plate.dfs.keys():
-                    self.update_button("normalize_category", "green")
+                    self.update_button("normalize_category", color="green", default='normal')
             if self.current_plate.dfs:
-                self.update_button("normalize_source", "green")
+                self.update_button("normalize_source", color="green", default='normal')
         if self.current_source:
             self.update_button("parse_source", "green")
         if self.kitchen:
@@ -78,24 +94,38 @@ class KitchenGraphic(GUI):
             self.update_button("update_normalizer", "green")
             self.update_button("update_modeler", "green")
 
-    def cook_url(self):
+    def update_current_labels(self) -> None:
+        super(KitchenGraphic, self).update_current_labels()
+        self.update_label("plate_name_lb", f"Name: {self.current_plate.name if self.current_plate else '-'}")
+        self.update_label("plate_url_lb", f"Url: {self.current_plate.url if self.current_plate else '-'}")
+        self.update_label("plate_category_lb",
+                          f"Category: {self.current_plate.category if self.current_plate else '-'}")
+        self.update_label("plate_status_lb", f"Status: {self.current_plate.status if self.current_plate else '-'}")
+
+    def use_my_df(self, df: pd.DataFrame):
+        new_plate = Plate(name=self.current_source.lower().replace(' ', '_'), category=self.current_category)
+
+        new_plate.item_links[self.current_category] = [{"name": row[1]["name"],
+                                                        "url": row[1]["url"]
+                                                        } for row in df.iterrows()]
+        new_plate.status = "validated"
+        self.current_plate = new_plate
+        self.update_current_labels()
+        self.update_current_buttons()
+        self.display_category()
+
+    def cook_url(self) -> None:
         self.clear_message_box()
         self.current_plate = None
         if self.current_url:
-            plate = self.kitchen.cook_url(self.current_url)
+            plate = self.kitchen.cook_url(self.current_url, keep_alive=False)
             self.__getattribute__("message_box").insert(END, f'-- Plate provided --')
             if plate.soup:
                 self.current_plate = plate
                 self.clear_query_lists()
                 self.display_plate()
-                response = messagebox.askyesnocancel(title='Save Soup as Plate.csv?',
-                                                     message='Save soup in csv with yes answer,no save in db or cancel')
-                if response is None:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' extracted --")
-                elif response is True:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in csv--")
-                else:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in db--")
+                self.update_current_labels()
+                self.update_current_buttons()
         else:
             self.__getattribute__("message_box").insert(END, f'-- No Url to cook, click one --')
         self.update_current_buttons()
@@ -107,8 +137,7 @@ class KitchenGraphic(GUI):
         self.__getattribute__("query_list").insert(END,
                                                    "Title:", self.current_plate.title,
                                                    "Category:", self.current_plate.category,
-                                                   "Validated:", self.current_plate.validated,
-                                                   "Completed:", self.current_plate.validated
+                                                   "Status:", self.current_plate.status
                                                    )
         if self.current_plate.data_dict:
             self.__getattribute__("query_list").insert(END, f"Item: {self.current_plate.name}")
@@ -146,6 +175,7 @@ class KitchenGraphic(GUI):
             else:
                 self.__getattribute__("message_box").insert(END, f'-- Plate {self.current_plate.name} Not completed --')
             self.update_current_buttons()
+            self.update_current_labels()
 
     def parse_category(self) -> None:
         if not self.current_category:
@@ -157,6 +187,8 @@ class KitchenGraphic(GUI):
             self.__getattribute__("message_box").insert(END, message)
             self.kitchen.parse_category(self.current_plate, self.current_category)
             self.__getattribute__("message_box").insert(END, '-- Category parsed --')
+            self.update_current_labels()
+            self.update_current_buttons()
         else:
             if self.current_plate:
                 self.__getattribute__("message_box").insert(END, '-- No item link found in plate--')
@@ -171,6 +203,8 @@ class KitchenGraphic(GUI):
                     self.__getattribute__("message_box").insert(END, f'-- Links found for {self.current_category} --')
                     self.kitchen.parse_category(link_plate, self.current_category)
                     self.__getattribute__("message_box").insert(END, '-- Category parsed --')
+                    self.update_current_labels()
+                    self.update_current_buttons()
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, f'-- {file_name} Not Found!--')
 
@@ -181,17 +215,35 @@ class KitchenGraphic(GUI):
     def extract_sources(self) -> None:
         plate = self.kitchen.extract_sources()
         if plate:
+            plate.category = "sources"
             self.current_plate = plate
             self.current_item = plate.name
-            self.current_source = ""
-            self.current_item = ""
+            self.current_source = plate.category
+            self.current_category = "sources"
+            self.current_url = plate.url
             self.update_current_labels()
             self.update_current_buttons()
             self.__getattribute__("message_box").insert(END, '-- Sources Extracted!--')
-            if plate.name == "remaster":
-                self.__getattribute__("message_box").insert(END, f'-- Edition {plate.name} sorted!--')
+            self.display_plate()
         else:
             self.__getattribute__("message_box").insert(END, '-- Index Not Found!--')
+
+    def sort_sources(self) -> None:
+        if self.current_plate:
+            plate = self.kitchen.sort_sources_editions(self.current_plate)
+            if plate and plate.name == "remaster":
+                self.__getattribute__("message_box").insert(END, f'-- Edition {plate.name} sorted!--')
+                self.current_plate = plate
+                self.current_item = plate.name
+                self.current_source = plate.category
+                self.current_url = plate.url
+                self.update_current_labels()
+                self.update_current_buttons()
+                self.__getattribute__("message_box").insert(END, '-- Sources Extracted!--')
+                self.display_plate()
+
+        else:
+            self.__getattribute__("message_box").insert(END, '-- Plate Not Found!--')
 
     def normalize_category(self) -> None:
         pass
@@ -249,3 +301,13 @@ class KitchenGraphic(GUI):
 if __name__ == "__main__":
     gui = KitchenGraphic()
     gui.run()
+"""
+                response = messagebox.askyesnocancel(title='Save Soup as Plate.csv?',
+                                                     message='Save soup in csv with yes answer,no save in db or cancel')
+                if response is None:
+                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' extracted --")
+                elif response is True:
+                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in csv--")
+                else:
+                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in db--")
+"""

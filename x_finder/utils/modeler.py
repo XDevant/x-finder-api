@@ -1,16 +1,18 @@
 from args import Ica
+from pandas import DataFrame
+from typing import Iterable
 
 
 class Modeler:
-    def __init__(self, target, edition):
-        self.target = target
-        self.edition = edition
-        self.ica = None
+    def __init__(self, target: str, edition: str) -> None:
+        self.target: str = target
+        self.edition: str = edition
+        self.ica: dict[str, dict[str, str]] | None = None
 
-    def get(self, argument, category="default", keys=False):
-        return Ica.get(self.ica, argument, category)
+    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
+        return Ica.get(self.ica, argument, category, keys)
 
-    def extract_model_dfs(self, df, key):
+    def extract_model_dfs(self, df: DataFrame, key: str):
         columns = self.get("model_columns", key)
         excluded = self.get("model_excluded_columns", key)
         if excluded:
@@ -29,3 +31,9 @@ class Modeler:
             columns.append("description_links")
         model_df = df[columns]
         return model_df
+
+    @staticmethod
+    def fit_source_to_model(df: DataFrame) -> DataFrame:
+        fit_df = df[["name", "source_group", "category", "release_date", "errata_date", "errata_version",
+                     "nethys_url", "paizo_url", "errata_url"]]
+        return fit_df

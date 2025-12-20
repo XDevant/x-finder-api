@@ -1,5 +1,5 @@
-from bs4 import BeautifulSoup
 from pandas import DataFrame
+from bs4.element import Tag
 
 
 class Plate:
@@ -16,12 +16,12 @@ class Plate:
                  name: str = "unknown",
                  category: str = "default",
                  content: bytes | None = None,
-                 soup: BeautifulSoup | None = None
+                 soup: Tag | None = None
                  ) -> None:
         self.url: str | None = url
         self.title: str = title
         self.content: bytes | None = content
-        self.soup: BeautifulSoup | None = soup
+        self.soup: Tag | None = soup
         self.name: str = name
         self.category: str = category
         self.item_links: dict[str | None, list[dict[str | None, str]]] = {}
@@ -44,7 +44,7 @@ class Status:
         self.last_key: str = ""  # we parsed a key and are loading values if truthy,
         self.loaded_values: list = []  # values can be in many nodes. We stack, waiting for end or key identification
         self.family: bool = False  # we expect nested items of the same category in this page
-        self.start: BeautifulSoup | None = None  # first node after item's title in soup Navigable string
+        self.start: Tag | None = None  # first node after item's title in soup Navigable string
 
 
 class Result:

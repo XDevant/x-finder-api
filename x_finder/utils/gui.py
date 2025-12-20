@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from tkinter import Tk, Label, Listbox, Entry, NS, EW, END, Button, Scrollbar, VERTICAL, TclError, Event
+from tkinter import Tk, Label, Listbox, Entry, NS, EW, END, Button, Scrollbar, VERTICAL, TclError, Event, HORIZONTAL
 import sqlite3 as lite
 import os
 import pandas as pd
 from x_finder.x_finder.settings import BASE_DIR
-from typing import Callable
+from typing import Callable, Literal
 
 
 class GUI:
@@ -26,16 +26,16 @@ class GUI:
         self.inbox_lb = Label(self.mw, text='Enter target,edition', bg='lightCyan2')
         self.inbox_entry = Entry(self.mw, width=30)
 
-        self.inbox_lb.grid(row=7, column=12, sticky=EW)
-        self.inbox_entry.grid(row=8, column=12, sticky=EW)
+        self.inbox_lb.grid(row=7, column=14, sticky=EW)
+        self.inbox_entry.grid(row=8, column=14, sticky=EW)
 
         self.new_csv_lb = Label(self.mw, text='name next .csv to be created', bg='lightCyan2')
         self.new_csv_entry = Entry(self.mw, width=30)
         self.new_csv_entry.insert(END, 'my_new_csv')
-        self.new_csv_lb.grid(row=16, column=12, sticky=EW)
-        self.new_csv_entry.grid(row=17, column=12, sticky=EW)
+        self.new_csv_lb.grid(row=16, column=14, sticky=EW)
+        self.new_csv_entry.grid(row=17, column=14, sticky=EW)
         self.sql_entry = Entry(self.mw, width=30)
-        self.sql_entry.grid(row=29, column=12, sticky=EW)
+        self.sql_entry.grid(row=29, column=14, sticky=EW)
 
         self.path = f"{BASE_DIR}\\utils\\fixtures\\csv\\"
         print(self.path)
@@ -44,8 +44,11 @@ class GUI:
         self.initialize_listboxes()
         self.initialize_buttons()
         self.initialize_vertical_spacing()
-        name = "scroll_v_source_list"
-        self.__getattribute__("source_url_list")['yscrollcommand'] = self.__getattribute__(name).set
+        self.__setattr__("scroll_h_query_list",
+                         Scrollbar(self.mw, orient=HORIZONTAL, command=self.__getattribute__("query_list").xview))
+        self.__getattribute__("query_list")['xscrollcommand'] = self.__getattribute__("scroll_h_query_list").set
+        self.__getattribute__("scroll_h_query_list").grid(row=29, column=5, columnspan=7, sticky=EW)
+
         self.initialize_path()
 
     def initialize_label(self,
@@ -74,16 +77,20 @@ class GUI:
                           row: int = 0,
                           column: int = 0,
                           text: str = '',
-                          bg: str = 'khaki2') -> None:
+                          bg: str = 'green',
+                          default: Literal['normal', 'active', 'disabled'] = "disabled") -> None:
         if name:
             if not text:
                 text = name.capitalize().replace('_bt', '')
 
-            self.__setattr__(name, Button(self.mw, text=text, bg=bg, command=command))
+            self.__setattr__(name, Button(self.mw, text=text, bg=bg, command=command, default=default))
             self.__getattribute__(name).grid(row=row, column=column)
 
-    def update_button(self, button: str, color: str = 'grey') -> None:
-        self.__getattribute__(button + "_bt").config(bg=color)
+    def update_button(self, button: str,
+                      color: str = 'grey',
+                      default: Literal['normal', 'active', 'disabled'] = 'disabled'
+                      ) -> None:
+        self.__getattribute__(button + "_bt").config(bg=color, default=default)
 
     def initialize_listbox(self,
                            name: str | None,
@@ -96,7 +103,8 @@ class GUI:
                            columnspan: int = 1,
                            scrollbar: bool = True) -> None:
         self.__setattr__(name, Listbox(self.mw, height=height, width=width, selectmode=selectmode))
-        self.__getattribute__(name).grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan)
+        if rowspan > 0:
+            self.__getattribute__(name).grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan)
         self.__setattr__(f"scroll_v_{name}",
                          Scrollbar(self.mw, orient=VERTICAL, command=self.__getattribute__(name).yview))
         self.__getattribute__(name)['yscrollcommand'] = self.__getattribute__(f"scroll_v_{name}").set
@@ -111,7 +119,7 @@ class GUI:
         self.initialize_button("clear_main_bt", command=self.clear_message_box, row=30, column=1, text="Clear Box")
         self.initialize_button("load_csv_bt", command=self.load_csv_in_db(), row=30, column=3, text="Load csv into db")
         self.initialize_button("export_csv_bt", command=self.export_as_csv(), row=30, column=5, text="Save as csv")
-        self.initialize_button("send_sql_bt", command=self.sql_input, row=30, column=12, text="Send Request")
+        self.initialize_button("send_sql_bt", command=self.sql_input, row=30, column=14, text="Send Request")
 
     def initialize_labels(self) -> None:
         self.initialize_label("target_lb", row=0, column=1)
@@ -124,34 +132,32 @@ class GUI:
         self.initialize_label("current_item_lb", row=10, column=1, text="No selected item")
         self.initialize_label("spacing_lb", row=11, column=1, text="- - - - - - -")
 
-        self.initialize_label("source_lb", row=0, column=3)
-        self.initialize_label("source_url_lb", row=0, column=5, text="url")
-        self.initialize_label("category_lb", row=0, column=7)
+        self.initialize_label("source_lb", row=0, column=5)
+        self.initialize_label("group_lb", row=0, column=3)
+        self.initialize_label("category_lb", row=0, column=7, columnspan=2)
+        self.initialize_label("table_lb", row=0, column=10, columnspan=2)
 
         self.initialize_label("query_name_lb", row=14, column=3, text="Item Name")
-        self.initialize_label("query_url_lb", row=14, column=5, text="Item Url")
-        self.initialize_label("query_lb", row=14, column=7, text="Item data", columnspan=4)
-        self.initialize_label("table_lb", row=0, column=9)
-        self.initialize_label("sql_lb", row=28, column=12, text='SQlite query:')
+        self.initialize_label("query_lb", row=14, column=5, text="Item data", columnspan=6)
+        self.initialize_label("sql_lb", row=28, column=14, text='SQlite query:')
 
     def initialize_listboxes(self) -> None:
         self.initialize_listbox("file_list", height=4, row=3, column=1, rowspan=3, scrollbar=False)
-        self.initialize_listbox("source_list", height=10, width=15, row=1, column=3, rowspan=10)
-        self.initialize_listbox("source_url_list", height=10, width=15, row=1, column=5, rowspan=10, scrollbar=False)
-        self.initialize_listbox("category_list", height=10, row=1, column=7, rowspan=10)
-        self.initialize_listbox("table_list", height=10, row=1, column=9, rowspan=10)
+        self.initialize_listbox("source_list", height=13, width=20, row=1, column=5, rowspan=12)
+        self.initialize_listbox("source_url_list", height=13, width=15, row=1, column=3, rowspan=0, scrollbar=False)
+        self.initialize_listbox("category_list", height=13, width=35, row=1, column=7, rowspan=12, columnspan=2)
+        self.initialize_listbox("table_list", height=13, width=35, row=1, column=10, rowspan=12, columnspan=2)
 
-        self.initialize_listbox("query_name_list", height=12, width=15, row=15, column=3, rowspan=12)
-        self.initialize_listbox("query_url_list", height=12, width=15, row=15, column=5, rowspan=12, scrollbar=False)
-        self.initialize_listbox("query_list", height=12, width=70, row=15, column=7, rowspan=12, columnspan=4,
-                                scrollbar=False)
-        self.initialize_listbox("message_box", height=5, row=1, column=12, rowspan=5, scrollbar=False)
+        self.initialize_listbox("query_name_list", height=14, width=15, row=15, column=3, rowspan=14)
+        self.initialize_listbox("query_url_list", height=14, width=15, row=15, column=5, rowspan=0, scrollbar=False)
+        self.initialize_listbox("query_list", height=14, width=100, row=15, column=5, rowspan=14, columnspan=7)
+        self.initialize_listbox("message_box", height=5, row=1, column=14, rowspan=5, scrollbar=False)
 
     def initialize_vertical_spacing(self) -> None:
-        self.initialize_label("space_0", text=' ', row=0, column=0, rowspan=22, sticky='NS')
-        self.initialize_label("space_2", text=' ', row=0, column=2, rowspan=22, sticky='NS')
-        self.initialize_label("space_8", text=' ', row=0, column=11, rowspan=22, sticky='NS')
-        self.initialize_label("space_4", text=' ', row=0, column=6, rowspan=11, sticky='NS')
+        self.initialize_label("space_0", text=' ', row=0, column=0, rowspan=30, sticky='NS')
+        self.initialize_label("space_2", text=' ', row=0, column=2, rowspan=30, sticky='NS')
+        self.initialize_label("space_8", text=' ', row=0, column=13, rowspan=30, sticky='NS')
+        self.initialize_label("space_4", text=' ', row=0, column=4, rowspan=13, sticky='NS')
 
     def update_current_labels(self) -> None:
         self.update_label("current_url_lb", f"Url: {self.current_url if self.current_url else '-'}")
@@ -161,7 +167,7 @@ class GUI:
 
     def update_current_buttons(self) -> None:
         """Overload in kitchen_gui"""
-        pass
+        Button(default='disabled')
 
     def initialize_path(self, target: str | None = None, edition: str | None = None) -> None:
         if target:
@@ -360,6 +366,7 @@ class GUI:
                 self.__getattribute__("source_list").selection_clear(0, 'end')
                 self.__getattribute__("source_url_list").selection_clear(0, 'end')
                 self.display_category()
+                self.clear_query_lists()
             else:
                 self.__getattribute__("message_box").insert(END, f'-- No file found for {folder} --')
         except FileNotFoundError:
@@ -380,26 +387,45 @@ class GUI:
     def select_category(self) -> None:
         try:
             file = self.__getattribute__("category_list").selection_get()
-            name = file.split('.')[0]
-            name = name.split('__')[0]
+            names = file.split('.')[0].split('__')
+            name = names[0]
+            status = names[-1].split('_')[0]
             pathfile = self.path + self.current_source + '/' + file
             df = pd.read_csv(pathfile, sep='|')
             self.clear_query_lists()
             for item in df.iterrows():
+                item_name = item[1]["name"]
+                item_url = item[1]["url"]
                 row_list = list(item[1])
-                self.__getattribute__("query_name_list").insert(END, row_list[0])
-                self.__getattribute__("query_url_list").insert(END, row_list[1])
+                self.__getattribute__("query_name_list").insert(END, item_name)
+                self.__getattribute__("query_url_list").insert(END, item_url)
                 if len(row_list) >= 2:
-                    cleared_list = [str(row) for row in row_list[2:]]
+                    cleared_list = [str(row) for row in row_list]
                     self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
-            if self.current_source != self.current_item and name != self.current_category:
-                self.current_item = ""
+            if name != self.current_category:
+                if self.current_source != self.current_item:
+                    self.current_item = ""
+                    self.current_url = ""
             self.current_category = name
+            self.use_my_df(df)
+            if status == "completed":
+                self.use_my_completed_df(df)
+            if status == "normed":
+                self.use_my_normed_df(df)
         except FileNotFoundError:
             self.__getattribute__("message_box").insert(END, '-- No category extracted for that source --')
         except AttributeError:
             self.__getattribute__("message_box").insert(END, '-- Source not found! --')
         self.__getattribute__("category_list").selection_clear(0, 'end')
+
+    def use_my_df(self, df: pd.DataFrame) -> None:
+        pass
+
+    def use_my_completed_df(self, df: pd.DataFrame) -> None:
+        pass
+
+    def use_my_normed_df(self, df: pd.DataFrame) -> None:
+        pass
 
     def clear_query_lists(self) -> None:
         self.__getattribute__("query_list").delete(0, 'end')

@@ -159,11 +159,15 @@ class Dh:
             result = Result()
             title = self.parser.find_start(plate, status, debug=False, verbose=False)
             result.titles.append(title)
+            print(title)
             if debug:
                 print("result title", *result.titles, status.start is not None)
             if status.start and title:
                 parsed_rows = self.parser.parse_item(plate, status=status, result=result,
                                                      debug=debug, verbose=verbose)
+                if not parsed_rows:
+                    print(f"Parsing failed for {title}")
+                    print(parsed_rows)
                 items = self.parser.complete_plate(plate, parsed_rows)
                 plate.data_dict = items
                 if items:
@@ -179,10 +183,15 @@ class Dh:
         return plate
 
     def extract_sources(self) -> Plate | None:
+        """ Here we skip both the extract_link and parse_item processes.
+        The url we target holds a result table in shadow dom.
+        the call to cook_url will return the table as soup, but also extracted the links in table.
+        We do not care about list data since we will go after detail data for each item.
+        The plate will hold a data_dict we build here with the item_links names and urls we got from the provider.
+        """
         url = self.get("index_url")
         plate = self.cook_url(url, keep_alive=True)
         link_list = self.parser.extract_links_by_id(plate, self.get("nav_id"), self.get("item_title"))
-        print(link_list)
         if not link_list:
             return None
         self.build_df(link_list, source_name="nethys")
@@ -193,13 +202,17 @@ class Dh:
                 source["type"] = source_type["name"]
                 unsorted_list.append(source)
         if unsorted_list:
-            print(unsorted_list)
             plate.data_dict["sources"] = unsorted_list
             plate.status = "completed"
             return plate
         return None
 
     def parse_sources_editions(self, source_plate: Plate, types: list[str] | None = None) -> [Plate, Plate]:
+        """ We want to sort our sources by release data or if exist errata date extracted from detail source pages
+        We need to parse older pages with a legacy kitchen, using heritage to slightly change our code and ica data.
+        This mostly consist in loading a json file, but will involve a new parser, normalizer and modeler if needed.
+        This method should evolve to return a collection of editions instead of 2.
+        """
         remaster_plate = Plate(category="sources")
         remaster_plate.data_dict["sources"] = []
         legacy_plate = Plate(category="sources")
@@ -210,15 +223,25 @@ class Dh:
                 plate = self.cook_url(source["url"], keep_alive=True)
                 self.validate_plate(plate)
                 self.parse_item(plate)
-                print(plate.data_dict)
                 remaster_list, legacy_list = self.parser.sort_sources(plate)
                 remaster_plate.data_dict["sources"] += remaster_list
                 legacy_plate.data_dict["sources"] += legacy_list
                 if remaster_list:
                     self.extract_source_links(plate)
                     for key, value in plate.item_links.items():
-                        self.build_df(value, source_name=plate.name, category=f"{key}__links", suffix="ok")
+                        self.build_df(value, source_name=plate.name, category=key, suffix="links_ok")
         return remaster_plate, legacy_plate
+
+    def say_hello(self) -> [str, bool]:
+        title = self.provider.say_hello()
+        return title, self.provider.cookies is not None
+
+    def normalize_df(self, plate: Plate, category: str, source_name: str) -> None:
+        if plate.dfs and category in plate.dfs.keys():
+            self.normalizer.norm_df(plate.dfs[category], category, source_name=source_name)
+
+    def fit_category_to_model(self, plate: Plate, category: str) -> None:
+        pass
 
     def update_worker(self, worker: str) -> None:
         reload(self.__getattribute__(worker.title()))
