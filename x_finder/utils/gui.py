@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from tkinter import Tk, Label, Listbox, Entry, NS, EW, END, Button, Scrollbar, VERTICAL, TclError, Event, HORIZONTAL
+from tkinter import Tk, Label, Listbox, Entry, Button, Scrollbar, VERTICAL, TclError, Event, HORIZONTAL, NS, EW, END
+from tkinter.ttk import Menubutton, OptionMenu
 import sqlite3 as lite
 import os
 import pandas as pd
@@ -37,8 +38,9 @@ class GUI:
         self.sql_entry = Entry(self.mw, width=30)
         self.sql_entry.grid(row=29, column=14, sticky=EW)
 
+        self.dropbox = Menubutton(self.mw, )
+
         self.path = f"{BASE_DIR}\\utils\\fixtures\\csv\\"
-        print(self.path)
         self.inbox_entry.bind('<Return>', self.load_inbox_input)
         self.initialize_labels()
         self.initialize_listboxes()
@@ -117,8 +119,8 @@ class GUI:
 
     def initialize_buttons(self) -> None:
         self.initialize_button("clear_main_bt", command=self.clear_message_box, row=30, column=1, text="Clear Box")
-        self.initialize_button("load_csv_bt", command=self.load_csv_in_db(), row=30, column=3, text="Load csv into db")
-        self.initialize_button("export_csv_bt", command=self.export_as_csv(), row=30, column=5, text="Save as csv")
+        self.initialize_button("load_csv_bt", command=self.load_csv_in_db, row=30, column=3, text="Load csv into db")
+        self.initialize_button("export_csv_bt", command=self.export_as_csv, row=30, column=5, text="Save as csv")
         self.initialize_button("send_sql_bt", command=self.sql_input, row=30, column=14, text="Send Request")
 
     def initialize_labels(self) -> None:
@@ -140,6 +142,7 @@ class GUI:
         self.initialize_label("query_name_lb", row=14, column=3, text="Item Name")
         self.initialize_label("query_lb", row=14, column=5, text="Item data", columnspan=6)
         self.initialize_label("sql_lb", row=28, column=14, text='SQlite query:')
+        Listbox(self.mw).yview_moveto(0.8)
 
     def initialize_listboxes(self) -> None:
         self.initialize_listbox("file_list", height=4, row=3, column=1, rowspan=3, scrollbar=False)
@@ -226,7 +229,7 @@ class GUI:
                 for row in rows:
                     drow = list(row)
                     self.__getattribute__("query_list").insert(END, drow)
-            self.display_table()
+            self.display_tables()
         except TclError:
             self.__getattribute__("message_box").insert(END, 'TclError: check current DB')
 
@@ -259,7 +262,7 @@ class GUI:
                     if '.sqlite' in entry.name and entry.is_file():
                         self.__getattribute__("source_list").insert(END, entry.name)
 
-    def display_table(self) -> None:
+    def display_tables(self) -> None:
         if self.db:
             con = lite.connect(self.db)
             with con:
@@ -279,35 +282,43 @@ class GUI:
             file = self.__getattribute__("category_list").selection_get()
             df = self.load_csv(file)
             name = file[:-4]
-            con = lite.connect(self.db)
-            with con:
-                try:
-                    df.to_sql(name=name, con=con, if_exists='fail')
-                except ValueError:
-                    self.__getattribute__("message_box").insert(END, '--Table already in current DB--')
+            self.df_to_db(df, name)
         except TclError:
             self.__getattribute__("message_box").insert(END, '--Select a .csv to load--')
-        self.display_table()
+        self.display_tables()
 
-    def load_csv(self, file_name: str) -> pd.DataFrame:
-        pathfile = self.path + file_name
-        print(pathfile)
-        df = pd.read_csv(pathfile, sep='|')
-        return df
+    def df_to_db(self, df: pd.DataFrame, name: str) -> None:
+        con = lite.connect(self.db)
+        with con:
+            try:
+                df.to_sql(name=name, con=con, if_exists='fail')
+                self.display_tables()
+                self.__getattribute__("message_box").insert(END, '--Table Created --')
+            except ValueError:
+                self.__getattribute__("message_box").insert(END, '--Table already in current DB--')
 
-    def export_as_csv(self) -> None:
+    def db_to_df(self, sql: str) -> pd.DataFrame | None:
         if not self.db:
             return
         con = lite.connect(self.db)
         con.row_factory = lite.Row
         with con:
             cur = con.cursor()
-            cur.execute(self.sql_entry.get())
+            cur.execute(sql)
             rows = cur.fetchall()
-        name = self.path + self.new_csv_entry.get() + '.csv'
         headers = list(rows[0].keys())
         data = [list(row) for row in rows]
         df = pd.DataFrame(data, columns=headers)
+        return df
+
+    def load_csv(self, file_name: str) -> pd.DataFrame:
+        pathfile = self.path + file_name
+        df = pd.read_csv(pathfile, sep='|')
+        return df
+
+    def export_as_csv(self) -> None:
+        name = self.path + self.new_csv_entry.get() + '.csv'
+        df = self.db_to_df(self.sql_entry.get())
         df.to_csv(name, index=False)
         self.display_csv()
 
@@ -440,7 +451,7 @@ class GUI:
         except TclError:
             self.__getattribute__("message_box").insert(END, '-- Selection failed --')
         self.__getattribute__("table_list").selection_clear(0, 'end')
-        self.display_table()
+        self.display_tables()
 
     def display_category(self) -> None:
         self.__getattribute__("category_list").delete(0, 'end')

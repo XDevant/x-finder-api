@@ -87,57 +87,22 @@ class Reader:
                 except StopIteration:
                     pass
             case "trait":
-                check = False
-                for trait in ["trait", "traituncommon", "traitrare", "traitunique"]:
-                    if trait in child.attrs["class"]:
-                        check = True
-                if check:
+                if self.check_for_traits(child):
                     if "traits" not in result.titles[status.ended].keys():
                         result.titles[status.ended]['traits'] = []
                     result.titles[status.ended]['traits'].append(child.get_text())
-                if "traitalignment" in child.attrs["class"]:  # legacy
-                    result.titles[status.ended]['alignement'] = child.get_text().strip()
-                if "traitsize" in child.attrs["class"]:
-                    result.titles[status.ended]['size'] = child.get_text().strip()
-                if "action" in child.attrs["class"]:
-                    result.titles[status.ended]['action'] = child.get_text().strip()
-                if "hanging-indent" in child.attrs["class"]:
-                    next_children = child.childrens
-                    if next_children:
-                        self.read_soup(next_children[0], status, result, category, debug=debug, verbose=verbose)
+                attributes = ["traitalignment", "traitsize", "action"]
+                for attribute in attributes:
+                    if attribute in child.attrs["class"]:  # legacy
+                        result.titles[status.ended][attribute.split("trait")[-1]] = child.get_text().strip()
             case "table":
-                self.find_table_key_name_and_description(status, result, child, category)
-                key, name, description = [""] * 3
-                if result.titles[status.ended]["name"].startswith('Table '):
-                    key, name = U.format_key(text=result.titles[status.ended]["name"])
-                    description = result.titles[status.ended].pop("description", "")
-                    result.titles = result.titles[:status.ended]
-                    status.ended -= 1
-                elif child.find('summary') is not None:
-                    key, name = U.format_key(child.find('summary'))
-                else:
-                    key, name = U.format_key(text=result.titles[status.ended]["name"])
-                    key = "table_" + key
+                key, name, description = self.find_table_key_name_and_description(status, result, child, category)
 
                 if child.name == "table":
                     table = U.load_nested_table(child)
                 else:
                     table = U.load_nested_table(child.find('table'))
-
-                if key and key not in result.titles[0].keys():
-                    result.titles[0][key] = {"name": name, "description": description, "table": table}
-                else:
-                    if key is None:
-                        key = f"table_{result.titles[0]['name']}"
-                    if category == "classes" and "spells" in result.titles[0].keys():
-                        key = f"table_spells_per_day_{result.titles[0]['name']}"
-                        result.titles[0][key] = {"name": name, "description": description, "table": table}
-                    else:
-                        for i in range(1, 50):
-                            test = key + "_" + str(i)
-                            if test not in result.titles[0].keys():
-                                result.titles[0][test] = {"name": name, "description": description, "table": table}
-                                break
+                result.titles[0][key] = {"name": name, "description": description, "table": table}
             case "describe":
                 values = []
                 if child.name in ['ol', 'ul']:
@@ -160,7 +125,7 @@ class Reader:
                     if "description" not in result.titles[index].keys():
                         result.titles[index]["description"] = []
                     result.titles[index]["description"] += values
-            case "default":
+            case _:
                 description = U.clean_text(child.get_text())
                 if child.name == "h3" and self.find_nested_item_category(U.format_key(child)[0],
                                                                          U.get_href(child)
@@ -301,6 +266,14 @@ class Reader:
         if name_model != "default":
             return name_model
         return ""
+
+    @staticmethod
+    def check_for_traits(child: Tag):
+        check = False
+        for trait in ["trait", "traituncommon", "traitrare", "traitunique"]:
+            if trait in child.attrs["class"]:
+                check = True
+        return check
 
     @staticmethod
     def describe(description: str, result: Result,  index: int = 0, link: bool = False) -> None:

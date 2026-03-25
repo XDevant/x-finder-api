@@ -28,31 +28,39 @@ class Dh:
         self.parser: Parser | None = None
         self.normalizer: Normalizer | None = None
         self.modeler: Modeler | None = None
+        self.load_ica()
         self.instantiate_provider()
         self.instantiate_parser()
         self.instantiate_normalizer()
         self.instantiate_modeler()
-        self.dispatch_ica()
 
     def instantiate_provider(self) -> None:
         self.provider = Provider(self.target, self.edition)
+        self.provider.ica = self.ica
 
     def instantiate_parser(self) -> None:
         self.parser = Parser(self.target, self.edition)
+        self.parser.ica = self.ica
+        self.parser.reader.ica = self.ica
 
     def instantiate_normalizer(self) -> None:
         self.normalizer = Normalizer(self.target, self.edition)
+        self.normalizer.ica = self.ica
 
     def instantiate_modeler(self) -> None:
         self.modeler = Modeler(self.target, self.edition)
+        self.modeler.ica = self.ica
 
-    def dispatch_ica(self) -> None:
+    def load_ica(self) -> None:
         with open(f"{BASE_DIR}\\utils\\{self.target}\\{self.edition}\\args.json") as file:
             self.ica = json.load(file)
+
+    def dispatch_ica(self) -> None:
         self.provider.ica = self.ica
         self.parser.ica = self.ica
         self.normalizer.ica = self.ica
         self.modeler.ica = self.ica
+        self.parser.reader.ica = self.ica
 
     def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str]:
         return Ica.get(self.ica, argument, category, keys)
@@ -116,7 +124,7 @@ class Dh:
             directory += "\\" + source_name
         self.save(df, suffix, directory=directory, app="utils")
         return df
-
+    """
     def finalize_completed_dfs(self, dict_of_dfs: dict[str, pd.DataFrame], source_name: str) -> None:
         normed_category_dfs = {}
         finalized_category_dfs = {}
@@ -139,6 +147,7 @@ class Dh:
                     self.save(model_df, f"{key}__finalized", directory=source_name, app=app)
                 except Exception:
                     print(f"An error occurred while finalizing {key} df")
+    """
 
     def extract_source_links(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
         unsorted_links = self.parser.extract_source_links(plate.soup)
@@ -146,23 +155,21 @@ class Dh:
         if debug or verbose:
             print(plate.no_category_item_links)
 
-    def validate_plate(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
-        validated = self.parser.validate_plate(plate)
-        if validated:
-            plate.status = "validated"
-        if debug or verbose:
-            print(f"Plate {'' if plate.validated else 'not'} validated")
-
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
-        if plate.status == "validated":
+        if plate.soup:
             status = Status(plate.name, plate.url)
             result = Result()
+            """
             title = self.parser.find_start(plate, status, debug=False, verbose=False)
+            """
+            titles = self.parser.find_titles(plate, debug=debug, verbose=verbose)
+            title = self.parser.parse_titles(plate, status, titles, debug=debug, verbose=verbose)
             result.titles.append(title)
-            print(title)
+
             if debug:
                 print("result title", *result.titles, status.start is not None)
-            if status.start and title:
+
+            if status.start:
                 parsed_rows = self.parser.parse_item(plate, status=status, result=result,
                                                      debug=debug, verbose=verbose)
                 if not parsed_rows:
@@ -171,15 +178,16 @@ class Dh:
                 items = self.parser.complete_plate(plate, parsed_rows)
                 plate.data_dict = items
                 if items:
-                    plate.status = "completed"
+                    plate.completed = True
             else:
                 print(f"title = {title}, start is {'none' if status.start is None else 'not none'}")
         else:
-            print("Plate not valid")
+            print("Plate not valid, bring the soup!")
 
     def cook_url(self, url: str, parser: str = "", keep_alive: bool = False) -> Plate:
         plate = Plate(url=url)
         self.provider.cook(plate, parser=parser, keep_alive=keep_alive)
+        self.parser.validate_plate(plate)
         return plate
 
     def extract_sources(self) -> Plate | None:
@@ -191,7 +199,7 @@ class Dh:
         """
         url = self.get("index_url")
         plate = self.cook_url(url, keep_alive=True)
-        link_list = self.parser.extract_links_by_id(plate, self.get("nav_id"), self.get("item_title"))
+        link_list = self.parser.extract_links_by_id(plate, self.get("nav_id"), self.get("title_tag"))
         if not link_list:
             return None
         self.build_df(link_list, source_name="nethys")
@@ -203,7 +211,7 @@ class Dh:
                 unsorted_list.append(source)
         if unsorted_list:
             plate.data_dict["sources"] = unsorted_list
-            plate.status = "completed"
+            plate.completed = True
             return plate
         return None
 
@@ -221,7 +229,6 @@ class Dh:
         for source in source_list:
             if not types or source["type"].lower() in types:
                 plate = self.cook_url(source["url"], keep_alive=True)
-                self.validate_plate(plate)
                 self.parse_item(plate)
                 remaster_list, legacy_list = self.parser.sort_sources(plate)
                 remaster_plate.data_dict["sources"] += remaster_list
@@ -236,51 +243,29 @@ class Dh:
         title = self.provider.say_hello()
         return title, self.provider.cookies is not None
 
-    def normalize_df(self, plate: Plate, category: str, source_name: str) -> None:
-        if plate.dfs and category in plate.dfs.keys():
-            self.normalizer.norm_df(plate.dfs[category], category, source_name=source_name)
+    def normalize_dfs(self, plate: Plate, source_name: str) -> None:
+        for category in plate.dfs.keys():
+            self.normalize_df(plate, category, source_name=source_name)
 
-    def fit_category_to_model(self, plate: Plate, category: str) -> None:
-        pass
+    def normalize_df(self, plate: Plate, category: str, source_name: str) -> None:
+        df = plate.dfs[category]
+        self.normalizer.norm_df(df, category, source_name=source_name)
+        try:
+            self.normalizer.__getattribute__(f"norm_{category}_df")(df, category)
+        except AttributeError:
+            pass
+
+    def fit_category_to_models(self, plate: Plate, category: str) -> None:
+        model_dfs = self.modeler.fit_category_to_models(plate.dfs[category], category)
+        if model_dfs:
+            directory = self.target + '\\' + self.edition
+            for model in model_dfs.keys():
+                self.save(model_dfs[model], f"{model}__finalized", directory=directory, app="utils")
 
     def update_worker(self, worker: str) -> None:
         reload(self.__getattribute__(worker.title()))
         invalidate_caches()
         self.__getattribute__(f"instantiate_{worker}")()
-
-    def find_nested_item_category(self, name, url, next_child=None, category="default") -> str:
-        name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
-        if category == "monsters":
-            if name in ["melee", "ranged"]:
-                return "monster_attacks"
-            if "spells" in name:
-                return "monster_spells"
-            return "monster_abilities"
-        if name in ["melee", "ranged"]:
-            return "animal_attacks"
-        if name == "activate":
-            return "equipment_activations"
-        if name.endswith("_tasks") and name.startswith("sample_"):
-            return "sample_tasks"
-
-        if next_child is not None and next_child.get_text():
-            next_text = next_child.get_text()
-            if next_text:
-                next_text = next_text.lower().strip(' (),;').replace(' ', '_')
-                if not next_text.endswith('s'):
-                    next_text += 's'
-                next_model = self.get("", next_text)
-                if next_model not in ["rules", "default"]:
-                    return next_model
-
-        name_model = self.get("", name)
-        url_base = url.split('.')[0].strip().lower().replace(' ', '_').replace('-', '_')
-        url_model = self.get("", url_base)
-        if url_model is not None and url_model not in ["rules", "default"]:
-            return url_model
-        if name_model != "default":
-            return name_model
-        return ""
 
 
 if __name__ == "__main__":

@@ -2,8 +2,18 @@
 item_category_arguments = {
     "default": {"base_url": "https://2e.aonprd.com/",
                 "app": "utils",
+                "index_url": "Sources.aspx",
+                "start_date": 2023,
+                "host_tag": "nethys-search",
+                "search_id": "results",
+                "search_tag": "table",
+
+                "nav_id": "ctl00_RadDrawer1_Content_MainContent_Navigation",
                 "main_id": "ctl00_RadDrawer1_Content_MainContent_DetailedOutput",
-                "item_title": "h1",
+                "title_id": "",
+                "title_tag": "h1",
+                "title_class": "title",
+
                 "row_start": "a",
                 "cell_starts": ["b"],
                 "cell_ends": ['b', 'br', 'hr', 'h1', 'h2', 'h3', 'table'],
@@ -18,6 +28,7 @@ item_category_arguments = {
                 "subtype": "",
                 "name_nest": "",
                 "no_description": False,
+
                 "row_separator": '<br/><b>',
                 "row_sep_bis": '',
                 "start": '<b>Source',
@@ -25,6 +36,7 @@ item_category_arguments = {
                 "cell_separator": '</b>',
                 "tail_start": '<br>',
                 "traits": False,
+
                 "model_columns": ["name", "nethys_url", "source", "source_page", "description"],
                 "model_excluded_columns": [],
                 },
@@ -32,6 +44,8 @@ item_category_arguments = {
                 "start": "</h1><b>",
                 "text_columns": ["latest_errata", "product_line", "release_date"],
                 "url_columns": ["product_page"],
+                "model_columns": ["name", "source_group", "category", "release_date", "errata_date", "errata_version",
+                                  "nethys_url", "paizo_url", "errata_url"],
                 },
     "actions": {"app": "core",
                 "text_columns": ["source", "traits", "action", "trigger", "prerequisite", "requirements", "cost",
@@ -75,7 +89,7 @@ item_category_arguments = {
                                            "advanced_maneuver"],
                           "model_columns": ["name", "nethys_url", "size", "str", "dex", "con", "int", "wis", "cha",
                                             "hit_points", "skill", "senses", "speed", "special", "support_benefit",
-                                            "advanced_maneuver""source", "source_page", "description"],
+                                            "advanced_maneuver", "source", "source_page", "description"],
                           },
     "animal_attacks": {"app": "core",
                        "text_columns": ["source", "melee", "ranged", "damage", "action"],

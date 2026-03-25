@@ -16,20 +16,88 @@ class Parser:
     def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
         return Ica.get(self.ica, argument, category, keys)
 
-    def validate_plate(self, plate: Plate) -> bool:
+    def validate_plate(self, plate: Plate) -> None:
         main_id = self.get("main_id")
-        detail_title = self.get("detail_title")
-        if plate.soup:
-            main = plate.soup.find(id=main_id)
-            if main:
-                title = main.find(detail_title)
-                if title:
-                    return True
-            else:
-                print("Main is none for {plate.name} in category {plate.category}")
+        if plate.soup and plate.soup.find(id=main_id):
+            plate.validated = True
+
+    def find_titles(self, plate: Plate, debug: bool = False, verbose: bool = False) -> list[Tag]:
+        main_id = self.get("main_id")
+        title_id = self.get("title_id")
+        title_tag = self.get("title_tag")
+        title_class = self.get("title_class")
+        main = plate.soup.find(id=main_id)
+        if title_id:
+            titles = main.find_all(id=title_id)
         else:
-            print(f"No soup provided for {plate.name} in category {plate.category}.")
-        return False
+            titles = main.find_all(title_tag, class_=title_class)
+        if verbose:
+            print(titles)
+        if debug and len(titles) == 0:
+            print("No title found")
+        return titles
+
+    def parse_titles(self,
+                     plate: Plate,
+                     status: Status,
+                     titles: list[Tag],
+                     debug: bool = False,
+                     verbose: bool = False) -> None | dict[str, str]:
+        title_dict = {"plate_name": plate.name,
+                      "x_finder_model": plate.category}
+        expected_length = 1
+        end = "level" in self.get("text_columns", plate.category)
+        end_found = not end
+        if end:
+            expected_length += 1
+        for title in titles:
+            if not title.get_text():
+                continue
+            title_content = title.get_text(separator=',').split(',')
+            title_content = [part.strip(' ,;') for part in title_content]
+            title_dict["name"] = title_content[0]
+            next_tag = title.next_sibling
+            status.start = next_tag
+
+            if len(title_content) >= expected_length:
+                text = title_content[1]
+                if "action" in text:
+                    title_dict['action'] = text
+                    expected_length += 1
+
+            if end and len(title_content) >= expected_length:
+                level = title_content[-1]
+                if level:
+                    title_dict["level"] = level
+                    expected_length += 1
+                    end_found = True
+                    if level.endswith('+'):
+                        status.family = True
+
+            title_links = title.find_all('a')
+            if title_links:
+                title_links = [link for link in title_links if link['href'] and link['href'] != 'PFS.aspx']
+            if title_links:
+                link = title_links[0]
+                title_dict["url"] = link['href']
+            else:
+                title_dict["url"] = plate.url
+
+            if not end_found and not title_links:
+                next_text = next_tag.get_text()
+                if next_text:
+                    title_dict["description"] = [next_text]
+                if debug:
+                    print("Possible fake title spotted")
+                continue
+            if verbose:
+                print(f"Start found for {'family' if status.family else 'item'}: {title_dict['name']}")
+                print(f"on h1: {title}")
+            return title_dict
+
+        if debug:
+            print(title_dict, "Missing level or link")
+        return title_dict
 
     def complete_plate(self,
                        plate: Plate,
@@ -42,7 +110,7 @@ class Parser:
          """
         if "actions" not in parsed_rows.keys():
             return parsed_rows
-        if plate.category != "skills_general" and plate.category != "skills_general":
+        if plate.category != "skills_general" and plate.category != "skills":
             return parsed_rows
         action_list = parsed_rows["actions"]
         plate_item = parsed_rows[plate.category][0]
@@ -53,7 +121,7 @@ class Parser:
         for action in action_list:
             if " Trained Actions" in action["name"]:
                 trained = True
-            if trained and plate.category == "skills" or plate.category == "skills_general":
+            if trained:
                 if "prerequisite" not in action.keys():
                     action["prerequisite"] = []
                 if plate.category == "skills":
@@ -69,11 +137,9 @@ class Parser:
                    debug: bool = False,
                    verbose: bool = False
                    ) -> dict[str, list[dict[str, str]]]:
-        """Here we target the last div holding the title and the item content, extract data in the title then move
-        to the start of the item content and call the read_soup method to extract the expected key, values.
-        To make sure we find the title, ie the item's name and other expected data, we run a first method that
-        should work if the data are found within the title tag. If not, the second method will recursively fill the
-        missing parts with the text it finds.
+        """Here we target the first tag after the title  and call the read_soup method to extract the expected
+        key, values and fills the result instance.
+
         """
         if status.start is not None:
             self.reader.read_soup(status.start, status, result, plate.category, debug=debug, verbose=verbose)
@@ -138,98 +204,6 @@ class Parser:
             if "action" not in title.keys() and "traits" not in title.keys():
                 return False
         return True
-
-    def find_start(self,
-                   plate: Plate,
-                   status: Status,
-                   debug: bool = False,
-                   verbose: bool = False
-                   ) -> None | dict[str, str]:
-        title_dict = {"plate_name": plate.name,
-                      "x_finder_model": plate.category}
-        main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
-        if main is None:
-            print("main is none")
-        titles = main.find_all('h1')
-        if titles is None:
-            print("no title in main")
-            titles = plate.soup.find_all('h1')
-        if titles is None:
-            print("no title in MainContent")
-            return None
-        for title in titles:
-            if not title.get_text():
-                continue
-            title_content = title.get_text(separator=',').split(',')
-            title_dict["name"] = title_content[0].strip(' ,;')
-            status.start = title.next_sibling
-
-            if len(title_content) > 2:
-                text = title_content[1].strip(' ,;')
-                if "action" in text:
-                    title_dict['action'] = text
-
-            if "level" in self.get("text_columns", plate.category) and len(title_content) > 1:
-                level = title_content[-1].strip(' ,;')
-                if level:
-                    title_dict["level"] = level
-                if level.endswith('+'):
-                    status.family = True
-
-            title_links = title.find_all('a')
-            if not title_links:
-                continue
-            title_links = [link for link in title_links if link['href'] and link['href'] != 'PFS.aspx']
-            if title_links:
-                link = title_links[0]
-                title_dict["url"] = link['href']
-            else:
-                title_dict["url"] = plate.url
-            if verbose:
-                print(f"Start found for {'family' if status.family else 'item'}: {title_dict['name']}")
-                print(f"on h1: {title}")
-            return title_dict
-        if debug or verbose:
-            print(f"Start not found for h1: {status.name}")
-        status.start = None
-        return title_dict
-
-    def extract_links_by_id(self, plate: Plate, ica_id: str, ica_tag: str) -> list[dict[str, str] | None]:
-        """ If our table is split among sub-tables, we fetch their urls.
-        We store their names / urls as key / value pairs in a dict """
-        if plate.soup:
-            main = plate.soup.find(id=ica_id)
-            print(main)
-            if main:
-                main = main.find_all(ica_tag, recursive=True)
-            if not main:
-                main = plate.soup.find(id=ica_id).find('nethys-search')
-                print(main)
-                if main:
-                    print("found table")
-                    main = main.find_all('td', recursive=True)
-                    if not main:
-                        print("No td found")
-                        return []
-                else:
-                    print("no table found")
-                return []
-            nav_links = []
-            for node in main:
-                print(node)
-                links = node.find_all('a', recursive=True)
-                if links:
-                    nav_list = [{"name": link.get_text(), "url": link['href']} for link in links]
-                    self.clean_links(nav_list)
-                    nav_links += nav_list
-            if nav_links:
-                print("links extracted")
-                return nav_links
-            print("links not found")
-            return []
-        else:
-            print("No soup found, did you cook it?")
-            return []
 
     def sort_sources(self, plate: Plate) -> [list, list]:
         remaster_start_year = self.get("start_date")
@@ -311,3 +285,40 @@ class Parser:
                 flags.append(item_dict["url"])
                 category_data[item_category].append(item_dict)
         return category_data, no_category_data
+
+    def extract_links_by_id(self, plate: Plate, ica_id: str, ica_tag: str) -> list[dict[str, str] | None]:
+        """ If our table is split among sub-tables, we fetch their urls.
+        We store their names / urls as key / value pairs in a dict """
+        if plate.soup:
+            main = plate.soup.find(id=ica_id)
+            print(main)
+            if main:
+                main = main.find_all(ica_tag, recursive=True)
+            if not main:
+                main = plate.soup.find(id=ica_id).find('nethys-search')
+                print(main)
+                if main:
+                    print("found table")
+                    main = main.find_all('td', recursive=True)
+                    if not main:
+                        print("No td found")
+                        return []
+                else:
+                    print("no table found")
+                return []
+            nav_links = []
+            for node in main:
+                print(node)
+                links = node.find_all('a', recursive=True)
+                if links:
+                    nav_list = [{"name": link.get_text(), "url": link['href']} for link in links]
+                    self.clean_links(nav_list)
+                    nav_links += nav_list
+            if nav_links:
+                print("links extracted")
+                return nav_links
+            print("links not found")
+            return []
+        else:
+            print("No soup found, did you cook it?")
+            return []

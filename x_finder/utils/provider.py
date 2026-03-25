@@ -63,7 +63,6 @@ class Provider:
         if cookies:
             home = self.get("base_url")
             domain = home.split('//')[-1].strip(' /')
-
             self.cookies = cookies
             print(*cookies)
 
@@ -90,10 +89,10 @@ class Provider:
         return False
 
     def get_shadow_dom_links(self, plate: Plate) -> None:
-        host = self.driver.find_element(By.TAG_NAME, "nethys-search")
+        host = self.driver.find_element(By.TAG_NAME, self.get("host_tag"))
         root = host.shadow_root
-        shadow_content = root.find_element(By.ID, "results")
-        table = shadow_content.find_element(By.TAG_NAME, "table")
+        shadow_content = root.find_element(By.ID, self.get("search_id"))
+        table = shadow_content.find_element(By.TAG_NAME, self.get("search_tag"))
         links = table.find_elements(By.TAG_NAME, "a")
         plate.item_links["sources"] = [{"name": link.text, "url": link.get_attribute("href")} for link in links]
         table_html = table.get_attribute("outerHTML")
@@ -153,11 +152,8 @@ class Provider:
         if plate.url:
             self.get_content(plate, keep_alive=keep_alive)
             if plate.content:
-                plate.status = "content"
                 plate.soup = self.cook_from_html(plate.content, parser)
                 self.extract_plate_name_and_category(plate)
-            if plate.soup:
-                plate.status = "soup"
 
     @staticmethod
     def request_contents(url: str) -> None | bytes:

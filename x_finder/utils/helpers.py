@@ -30,7 +30,23 @@ class Plate:
         self.dfs: dict[str | None, DataFrame] = {}
         self.validated: bool = False
         self.completed: bool = False
-        self.status: str = "empty"
+        self.normalized: bool = False
+        self.modeled: bool = False
+
+    def status(self):
+        if self.modeled:
+            return "modeled"
+        if self.normalized:
+            return "normalized"
+        if self.completed:
+            return "completed"
+        if self.validated:
+            return "validated"
+        if self.soup:
+            return "soup"
+        if self.content:
+            return "content"
+        return "empty"
 
 
 class Status:

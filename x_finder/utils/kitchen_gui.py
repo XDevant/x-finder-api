@@ -7,6 +7,9 @@ from tkinter import Event
 
 
 class KitchenGraphic(GUI):
+    debug = True
+    verbose = False
+
     def __init__(self) -> None:
         super().__init__()
         self.kitchen: Kitchen | None = None
@@ -100,19 +103,38 @@ class KitchenGraphic(GUI):
         self.update_label("plate_url_lb", f"Url: {self.current_plate.url if self.current_plate else '-'}")
         self.update_label("plate_category_lb",
                           f"Category: {self.current_plate.category if self.current_plate else '-'}")
-        self.update_label("plate_status_lb", f"Status: {self.current_plate.status if self.current_plate else '-'}")
+        self.update_label("plate_status_lb", f"Status: {self.current_plate.status() if self.current_plate else '-'}")
 
-    def use_my_df(self, df: pd.DataFrame):
-        new_plate = Plate(name=self.current_source.lower().replace(' ', '_'), category=self.current_category)
+    def update_display(self, message: str = "") -> None:
+        if message:
+            self.__getattribute__("message_box").insert(END, message)
+        self.update_current_labels()
+        self.update_current_buttons()
 
-        new_plate.item_links[self.current_category] = [{"name": row[1]["name"],
-                                                        "url": row[1]["url"]
-                                                        } for row in df.iterrows()]
-        new_plate.status = "validated"
+    def df_to_plate(self,
+                    df: pd.DataFrame,
+                    category: str,
+                    name: str | None = None,
+                    status: str | None = None) -> None:
+        if name is None:
+            name = self.current_source.lower().replace(' ', '_')
+
+        new_plate = Plate(name=name, category=category)
+        if "name" in df.columns and "url" in df.columns:
+            links = [{"name": row[1]["name"], "url": row[1]["url"]} for row in df.iterrows()]
+            new_plate.item_links[self.current_category] = links
+        if category:
+            new_plate.dfs[category] = df
+            if status in ["completed", "normalized", "modeled"]:
+                new_plate.completed = True
+                if status != "completed":
+                    new_plate.normalized = True
+                    if status == "modeled":
+                        new_plate.modeled = True
         self.current_plate = new_plate
         self.update_current_labels()
         self.update_current_buttons()
-        self.display_category()
+        self.display_plate()
 
     def cook_url(self) -> None:
         self.clear_message_box()
@@ -124,8 +146,7 @@ class KitchenGraphic(GUI):
                 self.current_plate = plate
                 self.clear_query_lists()
                 self.display_plate()
-                self.update_current_labels()
-                self.update_current_buttons()
+                self.update_display()
         else:
             self.__getattribute__("message_box").insert(END, f'-- No Url to cook, click one --')
         self.update_current_buttons()
@@ -137,7 +158,7 @@ class KitchenGraphic(GUI):
         self.__getattribute__("query_list").insert(END,
                                                    "Title:", self.current_plate.title,
                                                    "Category:", self.current_plate.category,
-                                                   "Status:", self.current_plate.status
+                                                   "Status:", self.current_plate.status()
                                                    )
         if self.current_plate.data_dict:
             self.__getattribute__("query_list").insert(END, f"Item: {self.current_plate.name}")
@@ -163,7 +184,7 @@ class KitchenGraphic(GUI):
 
     def parse_item(self) -> None:
         if self.current_plate:
-            self.kitchen.parse_item(self.current_plate, debug=True, verbose=True)
+            self.kitchen.parse_item(self.current_plate, debug=self.debug, verbose=self.verbose)
             self.clear_query_lists()
             self.display_plate()
             if self.current_plate.validated:
@@ -174,8 +195,7 @@ class KitchenGraphic(GUI):
                 self.__getattribute__("message_box").insert(END, f'-- Plate {self.current_plate.name} completed --')
             else:
                 self.__getattribute__("message_box").insert(END, f'-- Plate {self.current_plate.name} Not completed --')
-            self.update_current_buttons()
-            self.update_current_labels()
+            self.update_display()
 
     def parse_category(self) -> None:
         if not self.current_category:
@@ -185,13 +205,12 @@ class KitchenGraphic(GUI):
         if check and self.current_category in self.current_plate.item_links.keys():
             message = f'-- Parsing {self.current_category} for {self.current_plate.name} --'
             self.__getattribute__("message_box").insert(END, message)
-            self.kitchen.parse_category(self.current_plate, self.current_category)
-            self.__getattribute__("message_box").insert(END, '-- Category parsed --')
-            self.update_current_labels()
-            self.update_current_buttons()
+            self.kitchen.parse_category(self.current_plate,
+                                        self.current_category,
+                                        debug=self.debug,
+                                        verbose=self.verbose)
+            self.update_display(message='-- Category parsed --')
         else:
-            if self.current_plate:
-                self.__getattribute__("message_box").insert(END, '-- No item link found in plate--')
             file_name = self.current_source + '\\' + self.current_category + "__links_ok.csv"
             try:
                 links_from_csv = self.load_csv(file_name)
@@ -200,17 +219,21 @@ class KitchenGraphic(GUI):
                     link_plate = Plate(name=f"{self.current_source}")
                     link_plate.category = self.current_category
                     link_plate.item_links = {self.current_category: links_from_csv.to_dict('records')}
-                    self.__getattribute__("message_box").insert(END, f'-- Links found for {self.current_category} --')
-                    self.kitchen.parse_category(link_plate, self.current_category)
-                    self.__getattribute__("message_box").insert(END, '-- Category parsed --')
-                    self.update_current_labels()
-                    self.update_current_buttons()
+                    self.__getattribute__("message_box").insert(END, f'-- Csv found for {self.current_category} --')
+                    self.kitchen.parse_category(link_plate,
+                                                self.current_category,
+                                                debug=self.debug,
+                                                verbose=self.verbose)
+                    self.update_display(message='-- Category parsed --')
             except FileNotFoundError:
-                self.__getattribute__("message_box").insert(END, f'-- {file_name} Not Found!--')
+                if self.current_plate:
+                    self.__getattribute__("message_box").insert(END, '-- No item link found in plate--')
+                else:
+                    self.__getattribute__("message_box").insert(END, f'-- {file_name} Not Found!--')
 
     def parse_source(self) -> None:
         if self.current_plate and self.current_plate.item_links:
-            self.kitchen.parse_all_category(self.current_plate)
+            self.kitchen.parse_all_category(self.current_plate, debug=self.debug, verbose=self.verbose)
 
     def extract_sources(self) -> None:
         plate = self.kitchen.extract_sources()
@@ -221,9 +244,7 @@ class KitchenGraphic(GUI):
             self.current_source = plate.category
             self.current_category = "sources"
             self.current_url = plate.url
-            self.update_current_labels()
-            self.update_current_buttons()
-            self.__getattribute__("message_box").insert(END, '-- Sources Extracted!--')
+            self.update_display(message='-- Sources Extracted!--')
             self.display_plate()
         else:
             self.__getattribute__("message_box").insert(END, '-- Index Not Found!--')
@@ -237,11 +258,8 @@ class KitchenGraphic(GUI):
                 self.current_item = plate.name
                 self.current_source = plate.category
                 self.current_url = plate.url
-                self.update_current_labels()
-                self.update_current_buttons()
-                self.__getattribute__("message_box").insert(END, '-- Sources Extracted!--')
+                self.update_display(message='-- Sources Extracted!--')
                 self.display_plate()
-
         else:
             self.__getattribute__("message_box").insert(END, '-- Plate Not Found!--')
 

@@ -24,7 +24,7 @@ class SoupKitchen:
         self.H: Dh = handler_selector("nethys", "remaster")
 
     def __str__(self) -> str:
-        return f"Targeting {str(self.target)} {str(self.edition)} "
+        return f"Targeting {str(self.target)} {str(self.edition)}"
 
     def cook_url(self, url: str, parser: str = "", keep_alive: bool = True) -> Plate:
         """Sends an url to the provider to get a plate with a soup"""
@@ -33,7 +33,6 @@ class SoupKitchen:
 
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
         """Sends a provided plate to the parser to complete it"""
-        self.H.validate_plate(plate)
         if plate.category == "sources":
             self.H.extract_source_links(plate)
             self.save_source_links(plate, suffix="ok")
@@ -58,11 +57,18 @@ class SoupKitchen:
         print(title, got_cookies)
         return title, got_cookies
 
-    def normalize_df(self, plate: Plate, category: str) -> None:
-        pass
+    def reload_ica(self) -> None:
+        self.H.load_ica()
+        self.H.dispatch_ica()
+
+    def normalize_dfs(self, plate: Plate, source: str) -> None:
+        self.H.normalize_dfs(plate, source)
+
+    def normalize_df(self, plate: Plate, category: str, source: str) -> None:
+        self.H.normalize_df(plate, category, source)
 
     def fit_category_to_model(self, plate: Plate, category: str) -> None:
-        pass
+        self.H.fit_category_to_models(plate, category)
 
     def update_worker(self, worker):
         self.H.update_worker(worker)
@@ -100,8 +106,14 @@ class SoupKitchen:
     def parse_category(self,
                        source_plate: Plate,
                        category: str,
-                       limit: int = 20) -> None:
-        results, missed = self.complete_category_items(source_plate, category, limit=limit)
+                       limit: int = 20,
+                       debug: bool = False,
+                       verbose: bool = False) -> None:
+        results, missed = self.complete_category_items(source_plate,
+                                                       category,
+                                                       limit=limit,
+                                                       debug=debug,
+                                                       verbose=verbose)
         for key in results.keys():
             if key not in source_plate.data_dict.keys():
                 source_plate.data_dict[key] = []

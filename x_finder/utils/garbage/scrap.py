@@ -462,6 +462,61 @@ class SoupKitchen:
             return None
         return f"{parts[-1]}-{parts[0]}-{parts[1]}"
 
+    def find_start(self,
+                   plate: Plate,
+                   status: Status,
+                   debug: bool = False,
+                   verbose: bool = False
+                   ) -> None | dict[str, str]:
+        title_dict = {"plate_name": plate.name,
+                      "x_finder_model": plate.category}
+        main = plate.soup.find(id="ctl00_RadDrawer1_Content_MainContent_DetailedOutput")
+        if main is None:
+            print("main is none")
+        titles = main.find_all('h1')
+        if titles is None:
+            print("no title in main")
+            titles = plate.soup.find_all('h1')
+        if titles is None:
+            print("no title in MainContent")
+            return None
+        for title in titles:
+            if not title.get_text():
+                continue
+            title_content = title.get_text(separator=',').split(',')
+            title_dict["name"] = title_content[0].strip(' ,;')
+            status.start = title.next_sibling
+
+            if len(title_content) > 2:
+                text = title_content[1].strip(' ,;')
+                if "action" in text:
+                    title_dict['action'] = text
+
+            if "level" in self.get("text_columns", plate.category) and len(title_content) > 1:
+                level = title_content[-1].strip(' ,;')
+                if level:
+                    title_dict["level"] = level
+                if level.endswith('+'):
+                    status.family = True
+
+            title_links = title.find_all('a')
+            if not title_links:
+                continue
+            title_links = [link for link in title_links if link['href'] and link['href'] != 'PFS.aspx']
+            if title_links:
+                link = title_links[0]
+                title_dict["url"] = link['href']
+            else:
+                title_dict["url"] = plate.url
+            if verbose:
+                print(f"Start found for {'family' if status.family else 'item'}: {title_dict['name']}")
+                print(f"on h1: {title}")
+            return title_dict
+        if debug or verbose:
+            print(f"Start not found for h1: {status.name}")
+        status.start = None
+        return title_dict
+
 
 if __name__ == "__main__":
     bowl = SoupKitchen("Sources.aspx?ID=1")

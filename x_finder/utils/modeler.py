@@ -12,7 +12,15 @@ class Modeler:
     def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
         return Ica.get(self.ica, argument, category, keys)
 
-    def extract_model_dfs(self, df: DataFrame, key: str):
+    def fit_category_to_models(self, df: DataFrame, key: str) -> dict[str, DataFrame]:
+        tables_dict = {key: self.extract_model_df(df, key)}
+        tables_through = self.get("tables_through", key)
+        if tables_through:
+            for table_name in tables_through:
+                tables_dict[table_name] = self.extract_model_df(df, key)
+        return tables_dict
+
+    def extract_model_df(self, df: DataFrame, key: str) -> DataFrame:
         columns = self.get("model_columns", key)
         excluded = self.get("model_excluded_columns", key)
         if excluded:
@@ -31,9 +39,3 @@ class Modeler:
             columns.append("description_links")
         model_df = df[columns]
         return model_df
-
-    @staticmethod
-    def fit_source_to_model(df: DataFrame) -> DataFrame:
-        fit_df = df[["name", "source_group", "category", "release_date", "errata_date", "errata_version",
-                     "nethys_url", "paizo_url", "errata_url"]]
-        return fit_df
