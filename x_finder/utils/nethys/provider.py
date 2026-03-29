@@ -1,7 +1,8 @@
-from x_finder.utils.nethys.provider import TargetProvider
+from x_finder.utils.provider import Provider
 
 
-class EditionProvider(TargetProvider):
+class TargetProvider(Provider):
+    name = ""
 
     def __init__(self, target, edition, parser=None):
         super().__init__(target, edition, parser=parser)

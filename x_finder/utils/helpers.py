@@ -24,8 +24,7 @@ class Plate:
         self.soup: Tag | None = soup
         self.name: str = name
         self.category: str = category
-        self.item_links: dict[str | None, list[dict[str | None, str]]] = {}
-        self.no_category_item_links: dict[str | None, list[dict[str | None, str]]] = {}
+        self.item_links: DataFrame | None = None
         self.data_dict: dict[str | None, list[dict[str | None, str]]] = {}
         self.dfs: dict[str | None, DataFrame] = {}
         self.validated: bool = False

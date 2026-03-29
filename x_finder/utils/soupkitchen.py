@@ -1,6 +1,6 @@
 from time import time, sleep
 from multiprocessing import Pool
-from selector import handler_selector
+from selector import Selector
 from helpers import Plate
 from datahandling import Dh
 
@@ -21,7 +21,10 @@ class SoupKitchen:
         self.target: str = target
         self.edition: str = edition
         self.parser: str = parser
-        self.H: Dh = handler_selector("nethys", "remaster")
+        selector = Selector("nethys", "remaster")
+        self.H: Dh = selector.handler
+        self.targets = selector.targets
+        self.editions = selector.editions
 
     def __str__(self) -> str:
         return f"Targeting {str(self.target)} {str(self.edition)}"
@@ -33,13 +36,20 @@ class SoupKitchen:
 
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
         """Sends a provided plate to the parser to complete it"""
-        if plate.category == "sources":
-            self.H.extract_source_links(plate)
-            self.save_source_links(plate, suffix="ok")
-        self.H.parse_item(plate, debug=debug, verbose=verbose)
+        if plate.soup:
+            self.H.parse_item(plate, debug=debug, verbose=verbose)
+        elif debug:
+            print("-- No soup in my plate !")
 
-    def extract_source_links(self, plate: Plate):
-        self.H.extract_source_links(plate)
+    def extract_source_links(self,
+                             plate: Plate,
+                             debug: bool = False,
+                             verbose: bool = False,
+                             to_csv: bool = False
+                             ) -> None:
+        self.H.extract_source_links(plate, debug=debug, verbose=verbose)
+        if to_csv:
+            self.save_source_links(plate)
 
     def save_source_links(self, plate: Plate, suffix: str = "") -> None:
         new_suffix = "links"
@@ -47,10 +57,7 @@ class SoupKitchen:
             new_suffix += "_" + suffix
         if not suffix or suffix == "ok":
             for key, value in plate.item_links.items():
-                self.H.build_df(value, source_name=plate.name, category=key, suffix=new_suffix)
-        if not suffix or suffix == "ko":
-            for key, value in plate.no_category_item_links.items():
-                self.H.build_df(value, source_name=plate.name, category=key, suffix=new_suffix)
+                self.H.save(value, plate.category, directory=plate.name)
 
     def say_hello(self) -> [str, bool]:
         title, got_cookies = self.H.say_hello()
@@ -186,22 +193,13 @@ class SoupKitchen:
         """  """
         plate = self.H.extract_sources()
         if plate:
-            self.H.build_df(plate.data_dict["sources"], source_name="remaster", category="unsorted")
             return plate
         return None
 
-    def sort_sources_editions(self, plate: Plate, types: list[str] | None = None) -> Plate | None:
+    def sort_sources_editions(self, plate: Plate, types: list[str] | None = None) -> None:
         if not types:
             types = ["rulebooks"]
-        remaster, legacy = self.H.parse_sources_editions(plate, types=types)
-        if legacy.data_dict and "sources" in legacy.data_dict.keys() and legacy.data_dict["sources"]:
-            self.H.build_df(legacy.data_dict["sources"], source_name="sources", category="legacy")
-        if remaster.data_dict and "sources" in remaster.data_dict.keys() and remaster.data_dict["sources"]:
-            self.H.build_df(remaster.data_dict["sources"],
-                            source_name="sources",
-                            category=f"remaster{'_'.join(types)}")
-            return remaster
-        return None
+        self.H.parse_sources_editions(plate, self.editions, types=types)
 
     @staticmethod
     def clean_nav_links(nav_links) -> None:

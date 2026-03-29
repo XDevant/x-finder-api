@@ -1,11 +1,13 @@
 import pandas as pd
 from os import makedirs
 import json
+import sqlite3 as lite
 from args import Ica
 from provider import Provider
 from parser import Parser
 from normalizer import Normalizer
 from modeler import Modeler
+from reader import Reader
 from x_finder.x_finder.settings import BASE_DIR
 from typing import Iterable
 from helpers import Plate, Status, Result
@@ -19,7 +21,6 @@ class Dh:
      then we build a panda dataframe for each category of items and normalize them for data tidying
      and make sure our dfs match our database models and extract tables through.
      """
-
     def __init__(self, target="", edition=""):
         self.target: str = target
         self.edition: str = edition
@@ -28,6 +29,7 @@ class Dh:
         self.parser: Parser | None = None
         self.normalizer: Normalizer | None = None
         self.modeler: Modeler | None = None
+        self.path: str = f"{BASE_DIR}\\utils\\"
         self.load_ica()
         self.instantiate_provider()
         self.instantiate_parser()
@@ -40,6 +42,7 @@ class Dh:
 
     def instantiate_parser(self) -> None:
         self.parser = Parser(self.target, self.edition)
+        self.parser.reader = Reader()
         self.parser.ica = self.ica
         self.parser.reader.ica = self.ica
 
@@ -51,8 +54,20 @@ class Dh:
         self.modeler = Modeler(self.target, self.edition)
         self.modeler.ica = self.ica
 
+    def build_path(self, file: str, data: bool = False):
+        path = self.path
+        if data:
+            path += "fixtures\\csv\\"
+        if self.target:
+            path += f"{self.target}\\"
+        if self.edition:
+            path += f"{self.edition}\\"
+        path += file
+        return path
+
     def load_ica(self) -> None:
-        with open(f"{BASE_DIR}\\utils\\{self.target}\\{self.edition}\\args.json") as file:
+        path = self.build_path("args.json")
+        with open(path) as file:
             self.ica = json.load(file)
 
     def dispatch_ica(self) -> None:
@@ -82,6 +97,26 @@ class Dh:
             pathfile = f"{BASE_DIR}\\{app}\\fixtures\\csv\\{name}{'_' if suffix else ''}{suffix}.csv"
         df = pd.read_csv(pathfile, delimiter="|")
         return df
+
+    def save_df(self, df: pd.DataFrame, name: str, target: bool = False) -> None:
+        if target:
+            pass
+        else:
+            success = self.df_to_db(df, name)
+            if success:
+                print(f"df saved in table {name}")
+
+    def df_to_db(self, df: pd.DataFrame, name: str, db: str | None = None) -> bool:
+        if db is None:
+            file = f"{self.target}_{self.edition}.db"
+            db = self.build_path(file, data=True)
+        con = lite.connect(db)
+        with con:
+            try:
+                df.to_sql(name=name, con=con, if_exists='append')
+                return True
+            except ValueError:
+                return False
 
     def load_df(self, category: str, source: str = "", suffix: str = "", app: str = "utils") -> pd.DataFrame:
         directory = self.target + "/" + self.edition
@@ -151,38 +186,33 @@ class Dh:
 
     def extract_source_links(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
         unsorted_links = self.parser.extract_source_links(plate.soup)
-        plate.item_links, plate.no_category_item_links = self.parser.parse_source_links(unsorted_links)
-        if debug or verbose:
-            print(plate.no_category_item_links)
+        links = self.parser.parse_source_links(unsorted_links, plate.name)
+        plate.item_links = pd.DataFrame.from_records(data=links)
+        if verbose:
+            print(plate.item_links)
 
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
-        if plate.soup:
-            status = Status(plate.name, plate.url)
-            result = Result()
-            """
-            title = self.parser.find_start(plate, status, debug=False, verbose=False)
-            """
-            titles = self.parser.find_titles(plate, debug=debug, verbose=verbose)
-            title = self.parser.parse_titles(plate, status, titles, debug=debug, verbose=verbose)
-            result.titles.append(title)
+        status = Status(plate.name, plate.url)
+        result = Result()
+        titles = self.parser.find_titles(plate, debug=debug, verbose=verbose)
+        title = self.parser.parse_titles(plate, status, titles, debug=debug, verbose=verbose)
+        result.titles.append(title)
 
-            if debug:
-                print("result title", *result.titles, status.start is not None)
+        if debug:
+            print("result title", *result.titles, status.start is not None)
 
-            if status.start:
-                parsed_rows = self.parser.parse_item(plate, status=status, result=result,
-                                                     debug=debug, verbose=verbose)
-                if not parsed_rows:
-                    print(f"Parsing failed for {title}")
-                    print(parsed_rows)
+        if status.start:
+            parsed_rows = self.parser.parse_item(plate, status=status, result=result, debug=debug, verbose=verbose)
+            if not parsed_rows:
+                if debug:
+                    print(f"Parsing failed for {title}\n")
+            else:
                 items = self.parser.complete_plate(plate, parsed_rows)
                 plate.data_dict = items
                 if items:
                     plate.completed = True
-            else:
-                print(f"title = {title}, start is {'none' if status.start is None else 'not none'}")
         else:
-            print("Plate not valid, bring the soup!")
+            print(f"title = {title}, start is {'none' if status.start is None else 'not none'}")
 
     def cook_url(self, url: str, parser: str = "", keep_alive: bool = False) -> Plate:
         plate = Plate(url=url)
@@ -202,42 +232,43 @@ class Dh:
         link_list = self.parser.extract_links_by_id(plate, self.get("nav_id"), self.get("title_tag"))
         if not link_list:
             return None
-        self.build_df(link_list, source_name="nethys")
+        plate.item_links = pd.DataFrame.from_records(data=link_list)
         unsorted_list = []
         for source_type in link_list:
             type_plate = self.cook_url(source_type["url"], keep_alive=True)
-            for source in type_plate.item_links["sources"]:
-                source["type"] = source_type["name"]
-                unsorted_list.append(source)
+            self.extract_source_links(type_plate)
+            type_plate.item_links["type"] = source_type["name"]
+            unsorted_list += type_plate.item_links
         if unsorted_list:
-            plate.data_dict["sources"] = unsorted_list
+            plate.dfs["sources"] = pd.concat(*unsorted_list)
+            plate.data_dict["sources"] = plate.dfs["sources"].to_dict(orient='records')
             plate.completed = True
             return plate
         return None
 
-    def parse_sources_editions(self, source_plate: Plate, types: list[str] | None = None) -> [Plate, Plate]:
+    def parse_sources_editions(self,
+                               source_plate: Plate,
+                               editions: list[str],
+                               types: list[str] | None = None,
+                               ) -> None:
         """ We want to sort our sources by release data or if exist errata date extracted from detail source pages
         We need to parse older pages with a legacy kitchen, using heritage to slightly change our code and ica data.
         This mostly consist in loading a json file, but will involve a new parser, normalizer and modeler if needed.
         This method should evolve to return a collection of editions instead of 2.
         """
-        remaster_plate = Plate(category="sources")
-        remaster_plate.data_dict["sources"] = []
-        legacy_plate = Plate(category="sources")
-        legacy_plate.data_dict["sources"] = []
         source_list = source_plate.data_dict["sources"]
+        for edition in editions:
+            source_plate.data_dict[edition] = []
         for source in source_list:
             if not types or source["type"].lower() in types:
                 plate = self.cook_url(source["url"], keep_alive=True)
                 self.parse_item(plate)
-                remaster_list, legacy_list = self.parser.sort_sources(plate)
-                remaster_plate.data_dict["sources"] += remaster_list
-                legacy_plate.data_dict["sources"] += legacy_list
-                if remaster_list:
-                    self.extract_source_links(plate)
-                    for key, value in plate.item_links.items():
-                        self.build_df(value, source_name=plate.name, category=key, suffix="links_ok")
-        return remaster_plate, legacy_plate
+                sorted_dict = self.parser.sort_sources(plate, editions)
+                for key, value in sorted_dict.items():
+                    source_plate.data_dict[key] += value
+                    if key == self.edition:
+                        self.extract_source_links(plate)
+                        # save plate links in db
 
     def say_hello(self) -> [str, bool]:
         title = self.provider.say_hello()

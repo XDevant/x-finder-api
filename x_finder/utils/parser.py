@@ -11,7 +11,7 @@ class Parser:
         self.target: str = target
         self.edition: str = edition
         self.ica: dict[str, dict[str, str]] | None = None
-        self.reader: Reader = Reader()
+        self.reader: Reader | None = None
 
     def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
         return Ica.get(self.ica, argument, category, keys)
@@ -205,24 +205,29 @@ class Parser:
                 return False
         return True
 
-    def sort_sources(self, plate: Plate) -> [list, list]:
-        remaster_start_year = self.get("start_date")
-        remaster_list = []
-        legacy_list = []
+    def sort_sources(self, plate: Plate, editions: list[str]) -> [list, list]:
+        sorted_dict = {}
+        for edition in editions:
+            sorted_dict[edition] = []
         if "sources" not in plate.data_dict.keys():
-            return [], []
+            return sorted_dict
         for row in plate.data_dict["sources"]:
-            release = "0"
-            errata = "0"
-            if "release_date" in row.keys() and row["release_date"]:
-                release = row["release_date"][0]
-            if "latest_errata" in row.keys() and row["latest_errata"]:
-                errata = row["latest_errata"][0]
-            if self.find_year(release) >= remaster_start_year or self.find_year(errata) >= remaster_start_year:
-                remaster_list.append(row)
-            else:
-                legacy_list.append(row)
-        return remaster_list, legacy_list
+            edition = self.get_edition(row, editions)
+            sorted_dict[edition].append(row)
+        return sorted_dict
+
+    def get_edition(self, row, editions):
+        remaster_start_year = self.get("start_date")
+        release = "0"
+        errata = "0"
+        if "release_date" in row.keys() and row["release_date"]:
+            release = row["release_date"][0]
+        if "latest_errata" in row.keys() and row["latest_errata"]:
+            errata = row["latest_errata"][0]
+        if self.find_year(release) >= remaster_start_year or self.find_year(errata) >= remaster_start_year:
+            return "remaster"
+        else:
+            return "legacy"
 
     @staticmethod
     def find_year(date: str) -> int:
@@ -242,6 +247,7 @@ class Parser:
             try:
                 item_list = source_soup.find(id="main").find_all('u')
             except AttributeError:
+                print("No main id in soup")
                 return []
             try:
                 link_list = [item.a for item in item_list if item.a is not None]
@@ -252,39 +258,32 @@ class Parser:
         return []
 
     def parse_source_links(self,
-                           item_list: list[Tag]
-                           ) -> (dict[str, list[dict[str, str]]], dict[str, list[dict[str, str]]]):
-        category_data = {}
-        no_category_data = {}
+                           item_list: list[Tag],
+                           source_name: str
+                           ) -> (list[dict[str, str]]):
+        category_data = []
         flags = []
         for item in item_list:
             name = item.get_text()
             url = item['href']
-
-            if name:
-                item_dict = {"name": name, "url": url}
-            else:
+            if not name or not url:
                 continue
-            if url:
-                snake_item_category = url.split('.')[0]
-                item_category = U.snake_to_under(snake_item_category)
-                if "General=true" in url:
-                    item_category += "_general"
-            else:
-                item_category = "unknown"
 
-            if item_category not in self.get("", keys=True):
-                if item_category not in no_category_data.keys():
-                    no_category_data[item_category] = []
-                no_category_data[item_category].append(item_dict)
-            else:
-                if item_category not in category_data.keys():
-                    category_data[item_category] = []
-                if item_category == "equipment" and item_dict["url"] in flags:
-                    continue
-                flags.append(item_dict["url"])
-                category_data[item_category].append(item_dict)
-        return category_data, no_category_data
+            item_dict = {"name": name, "url": url, "source": source_name}
+            snake_item_category = url.split('.')[0]
+            item_category = U.snake_to_under(snake_item_category)
+            if "Group=" in url and item_category == "sources":
+                item_category += "_group"
+            if "General=true" in url:
+                item_category += "_general"
+            if item_category == "equipment" and item_dict["url"] in flags:
+                continue
+
+            item_dict["category"] = item_category
+            item_dict["check"] = item_category in self.get("", keys=True)
+            flags.append(item_dict["url"])
+            category_data.append(item_dict)
+        return category_data
 
     def extract_links_by_id(self, plate: Plate, ica_id: str, ica_tag: str) -> list[dict[str, str] | None]:
         """ If our table is split among sub-tables, we fetch their urls.

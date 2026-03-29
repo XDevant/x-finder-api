@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from x_finder.x_finder.settings import BASE_DIR
 from typing import Callable, Literal
+from selector import Selector
 
 
 class GUI:
@@ -17,12 +18,16 @@ class GUI:
         self.mw.title("Soup Kitchen")
         self.target = ""
         self.edition = ""
+        self.targets = []
+        self.editions = []
         self.current_source = ""
         self.current_url = ""
         self.current_category = ""
         self.current_item = ""
         self.loaded_sources: list[dict | None] = []
         self.db = None
+        self.target_db = None
+        self.from_filesystem = False
 
         self.inbox_lb = Label(self.mw, text='Enter target,edition', bg='lightCyan2')
         self.inbox_entry = Entry(self.mw, width=30)
@@ -172,6 +177,20 @@ class GUI:
         """Overload in kitchen_gui"""
         Button(default='disabled')
 
+    def check_db(self):
+        if self.target is None:
+            return
+        if self.edition is None:
+            db = self.path + f"{self.target}_index.db"
+            with lite.connect(db) as con:
+                con.row_factory = lite.Row
+            self.target_db = db
+        else:
+            db = self.path + f"{self.target}_{self.edition}.db"
+            with lite.connect(db) as con:
+                con.row_factory = lite.Row
+            self.db = db
+
     def initialize_path(self, target: str | None = None, edition: str | None = None) -> None:
         if target:
             self.target = target
@@ -186,25 +205,40 @@ class GUI:
             self.build_path("edition")
         if self.target:
             self.update_label("target_lb", f'Target: {self.target}')
+            self.check_db()
         if self.edition:
             self.update_label("edition_lb", f'Edition: {self.edition}')
+            self.check_db()
 
     def build_path(self, stage: str) -> None:
-        csv_directories = self.get_directories()
-        if len(csv_directories) == 1:
-            name = csv_directories[0]
+        if self.from_filesystem:
+            options = self.build_path_from_filesystem()
+        else:
+            options = self.build_path_from_selector(stage)
+        if len(options) == 1:
+            name = options[0]
             self.__setattr__(stage, name)
             self.path += name + '\\'
             self.__getattribute__("message_box").insert(END, f'-- Found {stage} {name} --')
-        elif len(csv_directories) == 0:
+        elif len(options) == 0:
             self.__getattribute__("message_box").insert(END, '-- No target found, create one --')
         else:
-            self.display_edition()
+            self.__getattribute__("file_list").delete(0, 'end')
+            self.__getattribute__("message_box").insert(END, f'-- Choose your {stage}--')
+            for directory in options:
+                self.__getattribute__("file_list").insert(END, str(directory))
 
-    def build_directories(self) -> None:
-        csv_directories = self.get_directories()
+    def build_path_from_selector(self, stage: str) -> list[str]:
+        selector = Selector(self.target, self.edition)
+        return selector.__getattribute__(stage + 's')
+
+    def build_path_from_filesystem(self) -> list[str]:
+        directories = self.get_directories()
+        return directories
+
+    def build_directories(self, options: list[str]) -> None:
         self.__getattribute__("file_list").delete(0, 'end')
-        for directory in csv_directories:
+        for directory in options:
             self.__getattribute__("file_list").insert(END, str(directory))
 
     def get_directories(self) -> list:
@@ -217,9 +251,8 @@ class GUI:
     def sql_input(self) -> None:
         try:
             sql = self.sql_entry.get()
-            con = lite.connect(self.db)
-            con.row_factory = lite.Row
-            with con:
+            with lite.connect(self.db) as con:
+                con.row_factory = lite.Row
                 cur = con.cursor()
                 cur.execute(sql)
                 rows = cur.fetchall()
@@ -263,19 +296,22 @@ class GUI:
                         self.__getattribute__("source_list").insert(END, entry.name)
 
     def display_tables(self) -> None:
+        rows = self.execute_sql("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+        self.__getattribute__("table_list").delete(0, 'end')
+        if len(rows) == 0:
+            self.__getattribute__("message_box").insert(END, '--No Table Found.Create Table, Import csv or Load DB--')
+        else:
+            for row in rows:
+                self.__getattribute__("table_list").insert(END, row)
+
+    def execute_sql(self, sql: str) -> list:
         if self.db:
             con = lite.connect(self.db)
             with con:
                 cur = con.cursor()
-                cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+                cur.execute(sql)
                 rows = cur.fetchall()
-            self.__getattribute__("table_list").delete(0, 'end')
-            if len(rows) == 0:
-                self.__getattribute__("message_box").insert(END,
-                                                            '--No Table Found.Create Table, Import csv or Load DB--')
-            else:
-                for row in rows:
-                    self.__getattribute__("table_list").insert(END, row)
+            return rows
 
     def load_csv_in_db(self) -> None:
         try:
@@ -287,19 +323,37 @@ class GUI:
             self.__getattribute__("message_box").insert(END, '--Select a .csv to load--')
         self.display_tables()
 
-    def df_to_db(self, df: pd.DataFrame, name: str) -> None:
-        con = lite.connect(self.db)
+    def df_to_db(self, df: pd.DataFrame, name: str, db: str | None = None) -> None:
+        if db is None:
+            db = self.db
+        con = lite.connect(db)
         with con:
             try:
-                df.to_sql(name=name, con=con, if_exists='fail')
+                df.to_sql(name=name, con=con, if_exists='append')
                 self.display_tables()
-                self.__getattribute__("message_box").insert(END, '--Table Created --')
+                self.__getattribute__("message_box").insert(END, '--Table Created or Completed --')
             except ValueError:
                 self.__getattribute__("message_box").insert(END, '--Table already in current DB--')
 
-    def db_to_df(self, sql: str) -> pd.DataFrame | None:
+    def db_to_df(self,
+                 category: str | None = None,
+                 source: str | None = None
+                 ) -> pd.DataFrame | None:
         if not self.db:
             return
+        if category is None:
+            category = self.current_category
+        if source is None:
+            sql = (
+                "SELECT * "
+                f"From {category};"
+                  )
+        else:
+            sql = (
+                "SELECT * "
+                f"FROM {category} "
+                f"WHERE source={source};"
+            )
         con = lite.connect(self.db)
         con.row_factory = lite.Row
         with con:
@@ -336,6 +390,8 @@ class GUI:
             self.select_source(name, url)
         if list_box_name == "category_list":
             self.select_category()
+        if list_box_name == "table_list":
+            self.select_table()
         if list_box_name in ["query_url_list", "query_name_list"]:
             name = self.__getattribute__("query_name_list").get(index)
             url = self.__getattribute__("query_url_list").get(index)
@@ -398,44 +454,44 @@ class GUI:
     def select_category(self) -> None:
         try:
             file = self.__getattribute__("category_list").selection_get()
-            names = file.split('.')[0].split('__')
-            name = names[0]
-            status = names[-1].split('_')[0]
-            pathfile = self.path + self.current_source + '/' + file
-            df = pd.read_csv(pathfile, sep='|')
-            self.clear_query_lists()
-            for item in df.iterrows():
-                item_name = item[1]["name"]
-                item_url = item[1]["url"]
-                row_list = list(item[1])
-                self.__getattribute__("query_name_list").insert(END, item_name)
-                self.__getattribute__("query_url_list").insert(END, item_url)
-                if len(row_list) >= 2:
-                    cleared_list = [str(row) for row in row_list]
-                    self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
-            if name != self.current_category:
-                if self.current_source != self.current_item:
-                    self.current_item = ""
-                    self.current_url = ""
-            self.current_category = name
-            self.use_my_df(df)
-            if status == "completed":
-                self.use_my_completed_df(df)
-            if status == "normed":
-                self.use_my_normed_df(df)
-        except FileNotFoundError:
-            self.__getattribute__("message_box").insert(END, '-- No category extracted for that source --')
         except AttributeError:
             self.__getattribute__("message_box").insert(END, '-- Source not found! --')
-        self.__getattribute__("category_list").selection_clear(0, 'end')
+            return
+        names = file.split('.')[0].split('__')
+        name = names[0]
+        status = names[-1].split('_')[0]
+        pathfile = self.path + self.current_source + '/' + file
+        try:
+            df = pd.read_csv(pathfile, sep='|')
+        except FileNotFoundError:
+            self.__getattribute__("message_box").insert(END, '-- No category extracted for that source --')
+        else:
+            self.display_df(df)
+            self.update_category(name)
+            self.use_my_df(df, status)
+        finally:
+            self.__getattribute__("category_list").selection_clear(0, 'end')
 
-    def use_my_df(self, df: pd.DataFrame) -> None:
-        pass
+    def update_category(self, name: str) -> None:
+        if name != self.current_category:
+            if self.current_source != self.current_item:
+                self.current_item = ""
+                self.current_url = ""
+        self.current_category = name
 
-    def use_my_completed_df(self, df: pd.DataFrame) -> None:
-        pass
+    def display_df(self, df: pd.DataFrame) -> None:
+        self.clear_query_lists()
+        for item in df.iterrows():
+            item_name = item[1]["name"]
+            item_url = item[1]["url"]
+            row_list = list(item[1])
+            self.__getattribute__("query_name_list").insert(END, item_name)
+            self.__getattribute__("query_url_list").insert(END, item_url)
+            if len(row_list) >= 2:
+                cleared_list = [str(row) for row in row_list]
+                self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
 
-    def use_my_normed_df(self, df: pd.DataFrame) -> None:
+    def use_my_df(self, df: pd.DataFrame, status: str | None) -> None:
         pass
 
     def clear_query_lists(self) -> None:
@@ -446,12 +502,16 @@ class GUI:
     def select_table(self) -> None:
         try:
             table = self.__getattribute__("table_list").selection_get()
+            category, status = table.split("__")
             if table:
-                pass
+                df = self.db_to_df(table, self.current_source)
+                self.display_df(df)
+                self.update_category(category)
+                self.use_my_df(df, status)
         except TclError:
             self.__getattribute__("message_box").insert(END, '-- Selection failed --')
-        self.__getattribute__("table_list").selection_clear(0, 'end')
-        self.display_tables()
+        finally:
+            self.__getattribute__("table_list").selection_clear(0, 'end')
 
     def display_category(self) -> None:
         self.__getattribute__("category_list").delete(0, 'end')
@@ -497,9 +557,7 @@ class GUI:
             self.display_sources_from_folder()
 
     def display_edition(self) -> None:
-        if not self.edition:
-            self.build_directories()
-        else:
+        if self.edition:
             try:
                 self.__getattribute__("file_list").delete(0, 'end')
                 with os.scandir(self.path) as it:
@@ -529,6 +587,8 @@ class GUI:
         self.display_edition()
         self.display_sources()
         self.display_category()
+        if self.db:
+            self.display_tables()
         self.update_current_buttons()
         self.mw.mainloop()
 

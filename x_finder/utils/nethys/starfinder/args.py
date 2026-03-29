@@ -9,7 +9,7 @@ item_category_arguments = {
                 "search_tag": "table",
 
                 "nav_id": "ctl00_RadDrawer1_Content_MainContent_Navigation",
-                "main_id": "main",
+                "main_id": "ctl00_RadDrawer1_Content_MainContent_DetailedOutput",
                 "title_id": "",
                 "title_tag": "h1",
                 "title_class": "title",
