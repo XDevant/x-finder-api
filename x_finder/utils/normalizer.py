@@ -64,3 +64,7 @@ class Normalizer:
             columns['x_finder_related_model'] = "subtype"
         df.rename(columns=columns, inplace=True)
         return df
+
+    @staticmethod
+    def norm_sources_df(df: DataFrame) -> None:
+        pass

@@ -8,19 +8,28 @@ class TargetNormalizer(Normalizer):
         super().__init__(target, edition)
 
     @staticmethod
-    def norm_source_df(df: DataFrame) -> None:
-        df["release_date"] = [U.translate_date(date) for date in df["release_date"]]
+    def norm_sources_df(df: DataFrame) -> None:
+        for column in df.columns:
+            join = " "
+            if column.endswith("s"):
+                join = "; "
+            df[column] = df.apply(
+                lambda r: join.join([str(e) for e in r[column]]) if isinstance(r[column], list) else r[column],
+                axis=1)
+        df["release_date"] = df.apply(lambda r: U.translate_date(str(r["release_date"])), axis=1)
         df["errata_date"] = df.apply(
-            lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1]) if r["latest_errata"] else None,
+            lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else None,
             axis=1)
         df["errata_version"] = df.apply(
             lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",
             axis=1)
-        df.rename(columns={'product_page_url': 'paizo_url', 'latest_errata_url': 'errata_url', 'source_group': 'group'},
+        if "product_page_url" not in df.columns:
+            df["product_page_url"] = None
+        df.rename(columns={'product_page_url': 'paizo_url', 'product_line': 'group'},
                   inplace=True)
 
     @staticmethod
-    def norm_ancestries_df(df: DataFrame) -> None:
+    def norm_ancestry_df(df: DataFrame) -> None:
         abilities = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
         for ability in abilities:
             df[ability] = df.apply(
@@ -33,7 +42,7 @@ class TargetNormalizer(Normalizer):
             ).map({"Two": 2, "Free": 1})
 
     @staticmethod
-    def norm_backgrounds_df(df: DataFrame) -> None:
+    def norm_background_df(df: DataFrame) -> None:
         if "description_links" in df.columns:
             df["skill"] = df.apply(
                 lambda r: r["description_links"][0].split(": ")[0],
@@ -48,7 +57,7 @@ class TargetNormalizer(Normalizer):
                 lambda r: [cell.split(" ")[1] for cell in r["description"] if "free ability boost" in cell],
                 axis=1)
 
-    def norm_bloodlines_df(self, df: DataFrame) -> None:
+    def norm_bloodline_df(self, df: DataFrame) -> None:
         if "granted_spells" in df.columns:
             new_columns = ["granted_cantrip"] + [f"granted_{i}" for i in range(1, 10)]
             self.split_column(df, "granted_spells", new_columns, strip=' ', step=2)
@@ -58,7 +67,7 @@ class TargetNormalizer(Normalizer):
             self.split_column(df, "bloodline_spells", new_columns, strip=' ', step=2)
 
     @staticmethod
-    def norm_classes_df(df: DataFrame) -> None:
+    def norm_classe_df(df: DataFrame) -> None:
         if "perception" in df.columns:
             df["perception"] = df.apply(
                 lambda r: [el.split(" in ")[0].strip() for el in r["perception"] if el],
@@ -100,7 +109,7 @@ class TargetNormalizer(Normalizer):
                 lambda r: [el.split(" in ")[0].strip() for el in r["defenses"] if "unarmored defense" in el],
                 axis=1)
 
-    def norm_deities_df(self, df: DataFrame) -> None:
+    def norm_deity_df(self, df: DataFrame) -> None:
         if "cleric_spells" in df.columns:
             new_columns = ["first_cleric_spell", "second_cleric_spell_level", "second_cleric_spell",
                            "third_cleric_spell_level", "third_cleric_spell"]

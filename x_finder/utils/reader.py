@@ -1,6 +1,6 @@
 from typing import Literal, Iterable
 from bs4.element import Tag
-from helpers import Status, Result
+from helpers.helpers import Status, Result
 from utils import U
 from args import Ica
 
@@ -27,14 +27,17 @@ class Reader:
             current_category = result.titles[status.ended]['x_finder_model']  # the model name of the item (title)
 
         value = U.clean_text(child.get_text())   # we deal with the results we have before taking care of the data
-        store_time = child.name and child.name in self.get("cell_ends", current_category)
+        if current_category == "default":  # We are in an unidentified empty title we store on main item title[0] first
+            store_time = child.name and child.name in self.get("cell_ends", category)
+        else:  # We will store current or first, deciding witch in the store method
+            store_time = child.name and child.name in self.get("cell_ends", current_category)
         steal_time = result.titles[status.ended]["name"] in ["Activate", "Melee", "Ranged"] and not status.loaded_values
 
-        if status.last_key and store_time:  # we have all the values for that key we steal the if we have no value and
-            if steal_time:                  # are missing a name. Then we deal with the current child.
+        if status.last_key and store_time:  # we have all the values for that key.
+            if steal_time:                  # we steal the key if we have no value and are missing a title name.
                 result.titles[status.ended]["name"] = value
             else:
-                self.store(status, result, category, current_category)
+                self.store(status, result, category, current_category)  # key not stolen, we store
                 status.last_key = ""
                 status.loaded_values = []
 
@@ -42,50 +45,52 @@ class Reader:
         href = U.get_href(child)
         check_text_col = key and key in self.get("text_columns", category) + self.get("text_columns", current_category)
         hint = self.analyse_status_and_tag(child, status, current_category, key)  # return expected command in most case
+        if debug:
+            print(key, "tail:", tail, "hint:", hint, check_text_col)
         match hint:  # new round begins, what is the element about
             case "load":
                 if value:
                     value = self.remove_description_from_value(status, result, value)
                     status.loaded_values.append(value)
             case "new_title":
-                nested_category = self.find_nested_item_category(key, href)
+                nested_category = self.find_nested_item_category(key, href, category=category)
                 check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
                 check_key = check_text_col and not nested_category == "actions"
 
                 if check_key:
                     self.load_key_value(status, key, tail)
-                elif check_nest:
+                elif check_nest:  # a nested category is identified
                     self.add_new_title(child, result, status, nested_category)
-                elif status.family:
+                elif status.family:  # this url holds several items of the same family
                     self.add_new_title(child, result, status, category)
-                else:
+                else:  # We open a empty title, setting current_category to default, useful to escape
                     self.add_new_title(child, result, status)
             case "new_key":
                 nested_category = self.find_nested_item_category(key, href, child.next_sibling, category)
                 check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
                 if self.get("nested", current_category) and check_text_col and check_nest:
                     if key in result.titles[status.ended].keys() and nested_category == current_category:
+                        print("key stolen")
                         check_text_col = False
 
                 index = self.get_check_column_index(status, key, category, current_category)
-                if index >= 0:
+                if index >= 0:  # we have a key that matches a column that stores a bool
                     result.titles[index][key] = True
                     if tail:
                         self.describe(value, result, index=index)
-                elif not check_text_col:
+                elif not check_text_col:  # check overload for key_terms?
                     self.add_new_title(child, result, status, category=nested_category)
                     if key in self.get("text_columns", nested_category):
                         self.load_key_value(status, key, tail)
-                else:
+                else:  # normal behaviour
                     self.load_key_value(status, key, tail)
             case "dive":
-                children = child.childrens
-                try:
-                    next_child = next(children)
-                    if next_child:
-                        self.read_soup(next_child, status, result, category, debug=debug, verbose=verbose)
-                except StopIteration:
-                    pass
+                next_child = child.next_element
+                if next_child is not None:
+                    try:
+                        self.read_soup(child.next_element, status, result, category, debug=debug, verbose=verbose)
+                    except StopIteration:
+                        pass
             case "trait":
                 if self.check_for_traits(child):
                     if "traits" not in result.titles[status.ended].keys():
@@ -234,9 +239,13 @@ class Reader:
                                   category: str = "default"
                                   ) -> str:
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
-        check_category = category in ["classes", "causes", "doctrines", "research_field"]
+        check_category = category in ["causes", "doctrines", "research_field"]
         if check_category:
-            return f"class{'_optional' if category != 'classes' else ''}_features"
+            return "class_optional_features"
+        if category == "classes":
+            if "key_terms" in name:
+                return "key_terms"
+            return "class_features"
         if category == "monsters":
             if name in ["melee", "ranged"]:
                 return "monster_attacks"
@@ -301,13 +310,13 @@ class Reader:
             if child.name in self.get("cell_starts", current_category):
                 if key:
                     return "new_key"  # or for a key
-            if child.name == 'span' and "hanging-indent" in child.attrs["class"]:
-                return "dive"
             if child.name == 'span' and "class" in child.attrs:
+                if "hanging-indent" in child.attrs["class"]:
+                    return "dive"
                 return "trait"  # many to many data, like promos certifications etc..;
-            if child.name == "table" or child.name == "details" and 'table' in [c.name for c in child.childrens]:
+            if child.name == "table":
                 return "table"  # that we will more securely crawl in sub method
-            if child.name in ["div", "details", "br"] or "rules%" in child.name:
+            if child.name in ["div", "details"] or "rules%" in child.name:
                 return "dive"  # we will recursively parse its children
         if child.name in self.get("desc_tags", current_category) or child.name is None:
             return "describe"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+import sqlite3
 from tkinter import Tk, Label, Listbox, Entry, Button, Scrollbar, VERTICAL, TclError, Event, HORIZONTAL, NS, EW, END
 from tkinter.ttk import Menubutton, OptionMenu
 import sqlite3 as lite
@@ -9,6 +9,7 @@ import pandas as pd
 from x_finder.x_finder.settings import BASE_DIR
 from typing import Callable, Literal
 from selector import Selector
+from helpers.connection import Con
 
 
 class GUI:
@@ -20,6 +21,7 @@ class GUI:
         self.edition = ""
         self.targets = []
         self.editions = []
+        self.current_group = ""
         self.current_source = ""
         self.current_url = ""
         self.current_category = ""
@@ -151,7 +153,8 @@ class GUI:
 
     def initialize_listboxes(self) -> None:
         self.initialize_listbox("file_list", height=4, row=3, column=1, rowspan=3, scrollbar=False)
-        self.initialize_listbox("source_list", height=13, width=20, row=1, column=5, rowspan=12)
+        self.initialize_listbox("group_list", height=8, width=20, row=1, column=3, rowspan=7)
+        self.initialize_listbox("source_name_list", height=13, width=20, row=1, column=5, rowspan=12)
         self.initialize_listbox("source_url_list", height=13, width=15, row=1, column=3, rowspan=0, scrollbar=False)
         self.initialize_listbox("category_list", height=13, width=35, row=1, column=7, rowspan=12, columnspan=2)
         self.initialize_listbox("table_list", height=13, width=35, row=1, column=10, rowspan=12, columnspan=2)
@@ -178,18 +181,18 @@ class GUI:
         Button(default='disabled')
 
     def check_db(self):
-        if self.target is None:
+        if not self.target:
             return
-        if self.edition is None:
+        if not self.edition:
             db = self.path + f"{self.target}_index.db"
-            with lite.connect(db) as con:
-                con.row_factory = lite.Row
             self.target_db = db
         else:
             db = self.path + f"{self.target}_{self.edition}.db"
-            with lite.connect(db) as con:
-                con.row_factory = lite.Row
             self.db = db
+        con = Con(db)
+        tables = con.run("sqlite_master", action="select", columns=["name"])
+        print(tables)
+        return tables
 
     def initialize_path(self, target: str | None = None, edition: str | None = None) -> None:
         if target:
@@ -203,12 +206,17 @@ class GUI:
             self.path += edition + '\\'
         if not self.edition:
             self.build_path("edition")
+        tables = []
         if self.target:
             self.update_label("target_lb", f'Target: {self.target}')
-            self.check_db()
+            tables = self.check_db()
         if self.edition:
             self.update_label("edition_lb", f'Edition: {self.edition}')
-            self.check_db()
+            tables = self.check_db()
+        if tables:
+            self.display_tables()
+            self.display_category()
+            self.display_sources()
 
     def build_path(self, stage: str) -> None:
         if self.from_filesystem:
@@ -295,19 +303,10 @@ class GUI:
                     if '.sqlite' in entry.name and entry.is_file():
                         self.__getattribute__("source_list").insert(END, entry.name)
 
-    def display_tables(self) -> None:
-        rows = self.execute_sql("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
-        self.__getattribute__("table_list").delete(0, 'end')
-        if len(rows) == 0:
-            self.__getattribute__("message_box").insert(END, '--No Table Found.Create Table, Import csv or Load DB--')
-        else:
-            for row in rows:
-                self.__getattribute__("table_list").insert(END, row)
-
     def execute_sql(self, sql: str) -> list:
         if self.db:
-            con = lite.connect(self.db)
-            with con:
+            with lite.connect(self.db) as con:
+                con.row_factory = lite.Row
                 cur = con.cursor()
                 cur.execute(sql)
                 rows = cur.fetchall()
@@ -326,44 +325,50 @@ class GUI:
     def df_to_db(self, df: pd.DataFrame, name: str, db: str | None = None) -> None:
         if db is None:
             db = self.db
-        con = lite.connect(db)
-        with con:
-            try:
-                df.to_sql(name=name, con=con, if_exists='append')
-                self.display_tables()
-                self.__getattribute__("message_box").insert(END, '--Table Created or Completed --')
-            except ValueError:
-                self.__getattribute__("message_box").insert(END, '--Table already in current DB--')
+        conn = Con(db)
+        conn.run(name, df=df)
+        self.display_tables()
+        self.__getattribute__("message_box").insert(END, '--Table Created or Completed --')
 
     def db_to_df(self,
+                 name: str | None = None,
+                 source: str | None = None,
                  category: str | None = None,
-                 source: str | None = None
+                 group: str | None = None,
+                 db: str | None = None
                  ) -> pd.DataFrame | None:
-        if not self.db:
-            return
-        if category is None:
-            category = self.current_category
-        if source is None:
-            sql = (
-                "SELECT * "
-                f"From {category};"
-                  )
+        if db is None:
+            db = self.db
+            if not db:
+                if name in ["sources", "groups"]:
+                    db = self.target_db
+            if not db:
+                return
+        if name is None:
+            name = self.current_category
+        wheres = []
+        values = []
+        if source is not None:
+            wheres.append("source = ?")
+            values.append(source)
+        if category is not None:
+            wheres.append("category = ?")
+            values.append(category)
+        if group is not None and name == "sources":  # need join on source to get source.group or fk
+            wheres.append("group = ?")
+            values.append(group)
+        conn = Con(db)
+        if not wheres:
+            wheres = None
+        if not values:
+            values = None
         else:
-            sql = (
-                "SELECT * "
-                f"FROM {category} "
-                f"WHERE source={source};"
-            )
-        con = lite.connect(self.db)
-        con.row_factory = lite.Row
-        with con:
-            cur = con.cursor()
-            cur.execute(sql)
-            rows = cur.fetchall()
-        headers = list(rows[0].keys())
-        data = [list(row) for row in rows]
-        df = pd.DataFrame(data, columns=headers)
-        return df
+            values = tuple(values)
+        headers, rows = conn.run(name, action="select", wheres=wheres, values=values)
+        if rows:
+            df = pd.DataFrame(rows, columns=headers)
+            return df
+        return
 
     def load_csv(self, file_name: str) -> pd.DataFrame:
         pathfile = self.path + file_name
@@ -382,19 +387,30 @@ class GUI:
             index = int(w.curselection()[0])
         except IndexError:
             return
-        if list_box_name == "file_list":
-            self.select_edition()
-        if list_box_name in ["source_list", "source_url_list"]:
-            name = self.__getattribute__("source_list").get(index)
-            url = self.__getattribute__("source_url_list").get(index)
+        try:
+            selection = self.__getattribute__(list_box_name).selection_get()
+        except AttributeError:
+            self.__getattribute__("message_box").insert(END, '-- Source not found! --')
+            return
+        first_name = list_box_name.split('_')[0]
+        if first_name in ["category", "table", "group"]:
+            self.__getattribute__(f"select_{first_name}")(selection)
+            self.__getattribute__(list_box_name).selection_clear(0, 'end')
+        if first_name == "file":
+            self.select_edition(selection)
+            self.__getattribute__(list_box_name).selection_clear(0, 'end')
+        if first_name == "source":
+            name = self.__getattribute__(f"{first_name}_name_list").get(index)
+            url = self.__getattribute__(f"{first_name}_url_list").get(index)
+            self.__getattribute__(f"{first_name}_name_list").selection_clear(0, 'end')
+            self.__getattribute__(f"{first_name}_url_list").selection_clear(0, 'end')
             self.select_source(name, url)
-        if list_box_name == "category_list":
-            self.select_category()
-        if list_box_name == "table_list":
-            self.select_table()
-        if list_box_name in ["query_url_list", "query_name_list"]:
-            name = self.__getattribute__("query_name_list").get(index)
-            url = self.__getattribute__("query_url_list").get(index)
+
+        if first_name == "query":
+            name = self.__getattribute__(f"{first_name}_name_list").get(index)
+            url = self.__getattribute__(f"{first_name}_url_list").get(index)
+            self.__getattribute__(f"{first_name}_name_list").selection_clear(0, 'end')
+            self.__getattribute__(f"{first_name}_url_list").selection_clear(0, 'end')
             self.current_url = url
             self.current_item = name
         self.update_current_labels()
@@ -421,6 +437,10 @@ class GUI:
         except AttributeError:
             self.__getattribute__("message_box").insert(END, f'-- Wrong Input command --')
 
+    def select_group(self, selection: str):
+        self.current_group = selection
+        self.display_groups()
+
     def select_source(self, name: str, url: str) -> None:
         try:
             folder = name.lower().replace(' ', '_')
@@ -430,7 +450,7 @@ class GUI:
                 self.current_url = url
                 self.current_category = "sources"
                 self.current_item = self.current_source
-                self.__getattribute__("source_list").selection_clear(0, 'end')
+                self.__getattribute__("source_name_list").selection_clear(0, 'end')
                 self.__getattribute__("source_url_list").selection_clear(0, 'end')
                 self.display_category()
                 self.clear_query_lists()
@@ -439,28 +459,62 @@ class GUI:
         except FileNotFoundError:
             self.__getattribute__("message_box").insert(END, f'-- No category folder --')
 
-    def select_edition(self) -> None:
-        selection = self.__getattribute__("file_list").selection_get()
-        if self.edition or not selection:
+    def select_edition(self, selection) -> None:
+        if not selection or self.edition:
             pass
         elif not self.target:
             self.initialize_path(target=selection)
         else:
             self.initialize_path(edition=selection)
-        self.__getattribute__("file_list").selection_clear(0, 'end')
         self.display_edition()
         self.display_sources()
+        if self.edition:
+            self.display_tables()
+            self.display_groups()
 
-    def select_category(self) -> None:
-        try:
-            file = self.__getattribute__("category_list").selection_get()
-        except AttributeError:
-            self.__getattribute__("message_box").insert(END, '-- Source not found! --')
-            return
-        names = file.split('.')[0].split('__')
+    def select_category(self, selection: str) -> None:
+        if selection.endswith(".csv"):
+            self.select_category_from_csv(selection)
+        else:
+            self.select_category_from_db(selection)
+
+    def select_category_from_db(self, selection: str) -> None:
+        if selection:
+            source = None
+            group = None
+            if self.current_source:
+                source = self.current_source
+            if self.current_group:
+                group = self.current_group
+            link_df = self.db_to_df(name="links", source=source, category=selection, group=group)
+            if link_df is not None:
+                self.display_df(link_df)
+                self.update_category(selection)
+                self.use_my_dfs({"links": link_df})
+            if self.check_if_table_exists(selection):
+                print("ok")
+            else:
+                print("ko")
+
+    def check_if_table_exists(self, name: str, target: bool = False, lazy: bool = True) -> bool:
+        if target:
+            conn = Con(self.target_db)
+        else:
+            conn = Con(self.db)
+        where = "name = ?"
+        if lazy:
+            where = "name LIKE ?"
+            name += "%"
+        headers, tables = conn.run("sqlite_master", action="select", columns=["name"], wheres=[where], values=(name, ))
+        if tables:
+            return True
+        return False
+
+    def select_category_from_csv(self, selection: str) -> None:
+        names = selection.split('.')[0].split('__')
         name = names[0]
         status = names[-1].split('_')[0]
-        pathfile = self.path + self.current_source + '/' + file
+        pathfile = self.path + self.current_source + '/' + selection
         try:
             df = pd.read_csv(pathfile, sep='|')
         except FileNotFoundError:
@@ -468,7 +522,7 @@ class GUI:
         else:
             self.display_df(df)
             self.update_category(name)
-            self.use_my_df(df, status)
+            self.use_my_dfs({status: df})
         finally:
             self.__getattribute__("category_list").selection_clear(0, 'end')
 
@@ -482,16 +536,21 @@ class GUI:
     def display_df(self, df: pd.DataFrame) -> None:
         self.clear_query_lists()
         for item in df.iterrows():
-            item_name = item[1]["name"]
-            item_url = item[1]["url"]
-            row_list = list(item[1])
-            self.__getattribute__("query_name_list").insert(END, item_name)
-            self.__getattribute__("query_url_list").insert(END, item_url)
-            if len(row_list) >= 2:
-                cleared_list = [str(row) for row in row_list]
+            data_dict = item[1]
+            name = data_dict["name"]
+            url = ""
+            if "url" in data_dict.keys():
+                url = data_dict["url"]
+            elif "nethys_url" in data_dict.keys():
+                url = data_dict["nethys_url"]
+            data_list = list(data_dict)
+            self.__getattribute__("query_name_list").insert(END, name)
+            self.__getattribute__("query_url_list").insert(END, url)
+            if len(data_list) >= 2:
+                cleared_list = [str(row) for row in data_list]
                 self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
 
-    def use_my_df(self, df: pd.DataFrame, status: str | None) -> None:
+    def use_my_dfs(self, dfs: dict[str, pd.DataFrame]) -> None:
         pass
 
     def clear_query_lists(self) -> None:
@@ -499,22 +558,100 @@ class GUI:
         self.__getattribute__("query_name_list").delete(0, 'end')
         self.__getattribute__("query_url_list").delete(0, 'end')
 
-    def select_table(self) -> None:
-        try:
-            table = self.__getattribute__("table_list").selection_get()
-            category, status = table.split("__")
-            if table:
-                df = self.db_to_df(table, self.current_source)
+    def select_table(self, selection) -> None:
+        if selection:
+            source = None
+            category = None
+            group = None
+            if self.current_category and self.current_category not in ["groups", "sources", selection, "links"]:
+                category = self.current_category
+            if self.current_source:
+                source = self.current_source
+            if self.current_group:
+                group = self.current_group
+            df = self.db_to_df(name=selection, source=source, category=category, group=group)
+            if df is not None:
                 self.display_df(df)
-                self.update_category(category)
-                self.use_my_df(df, status)
-        except TclError:
-            self.__getattribute__("message_box").insert(END, '-- Selection failed --')
-        finally:
-            self.__getattribute__("table_list").selection_clear(0, 'end')
+                status = "normalized"
+                if selection == "links":
+                    status = "links"
+                if selection != "links" or not self.current_category:
+                    self.update_category(selection)
+                self.use_my_dfs({status: df})
+            else:
+                self.__getattribute__("message_box").insert(END, '-- No data Found --')
+
+    def get_db(self) -> str | None:
+        db = self.db
+        if not self.edition:
+            db = self.target_db
+        if not db or db is None:
+            self.__getattribute__("message_box").insert(END, '--No db Found!--')
+            return
+        return db
+
+    def display_groups(self) -> bool:
+        db = self.target_db
+        if db is None or not db:
+            self.__getattribute__("group_list").insert(END, "-- No target db --")
+            return False
+        self.__getattribute__("group_list").delete(0, 'end')
+        conn = Con(db)
+        if self.check_if_table_exists("groups", target=True):
+            name, groups = conn.run("groups", action="select", columns=["name"])
+            if groups:
+                for group in groups:
+                    self.__getattribute__("group_list").insert(END, group)
+                return True
+            self.__getattribute__("group_list").insert(END, "-- No group in db --")
+            return False
+        self.__getattribute__("group_list").insert(END, "-- No group table in db --")
+        return False
+
+    def display_tables(self) -> None:
+        db = self.get_db()
+        if db is None:
+            return
+        conn = Con(db)
+        name, tables = conn.run("sqlite_master",
+                                action="select",
+                                columns=["name"],
+                                wheres=["name NOT LIKE ?"],
+                                values=('sqlite_auto%', ))
+        self.__getattribute__("table_list").delete(0, 'end')
+        if len(tables) == 0:
+            self.__getattribute__("message_box").insert(END, '--No Table Found.Create Table, Import csv or Load DB--')
+        else:
+            for table in tables:
+                self.__getattribute__("table_list").insert(END, table)
 
     def display_category(self) -> None:
         self.__getattribute__("category_list").delete(0, 'end')
+        chk = self.display_category_from_db()
+        if not chk:
+            chk = self.display_category_from_csv()
+        if not chk:
+            self.__getattribute__("category_list").insert(END, "No Category extracted yet")
+
+    def display_category_from_db(self) -> bool:
+        db = self.db
+        if db is None or not db:
+            self.__getattribute__("message_box").insert(END, '--No db found--')
+            return False
+        conn = Con(db)
+        try:
+            name, category_list = conn.run("links", action="select", columns=["DISTINCT category"])
+        except sqlite3.OperationalError:
+            self.__getattribute__("message_box").insert(END, '--No link found in db--')
+            return False
+        if category_list:
+            for category in category_list:
+                self.__getattribute__("category_list").insert(END, category)
+            return True
+        self.__getattribute__("message_box").insert(END, '--No category found in db--')
+        return False
+
+    def display_category_from_csv(self) -> bool:
         folder = self.current_source
         if folder and not self.path.endswith('csv/'):
             path_to_file = f"{self.path}{folder}/"
@@ -522,8 +659,10 @@ class GUI:
                 with os.scandir(path_to_file) as it:
                     for entry in it:
                         self.__getattribute__("category_list").insert(END, entry.name)
+                return True
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, '--No category csv found--')
+        return False
 
     def display_sources_from_folder(self) -> None:
         if not self.path.endswith('csv/'):
@@ -531,7 +670,7 @@ class GUI:
                 with os.scandir(self.path) as it:
                     for entry in it:
                         if os.path.isdir(entry):
-                            self.__getattribute__("source_list").insert(END, entry.name)
+                            self.__getattribute__("source_name_list").insert(END, entry.name)
             except FileNotFoundError:
                 self.__getattribute__("message_box").insert(END, '-- No source folder found --')
 
@@ -540,17 +679,38 @@ class GUI:
         missed = 0
         for source in self.loaded_sources:
             try:
-                self.__getattribute__("source_list").insert(END, source["name"])
+                self.__getattribute__("source_name_list").insert(END, source["name"])
                 self.__getattribute__("source_url_list").insert(END, source["url"])
                 loaded += 1
             except KeyError:
                 missed += 1
         self.__getattribute__("message_box").insert(END, f'-- Loaded {loaded}/{loaded + missed} sources --')
 
+    def display_sources_from_db(self) -> bool:
+        db = self.db
+        if db is None or not db:
+            self.__getattribute__("message_box").insert(END, '--No db found--')
+            return False
+        conn = Con(db)
+        try:
+            headers, source_list = conn.run("sources", action="select", columns=["name", "nethys_url"])
+        except sqlite3.OperationalError:
+            self.__getattribute__("message_box").insert(END, '--No sources in db--')
+            return False
+        if source_list:
+            for source in source_list:
+                self.__getattribute__("source_name_list").insert(END, source[0])
+                self.__getattribute__("source_url_list").insert(END, source[1])
+            return True
+        self.__getattribute__("message_box").insert(END, '--No source found in db--')
+        return False
+
     def display_sources(self) -> None:
-        self.__getattribute__("source_list").delete(0, 'end')
+        self.__getattribute__("source_name_list").delete(0, 'end')
         if not self.edition:
-            pass
+            self.__getattribute__("source_name_list").insert(END, "  -- Edition not selected --  ")
+        elif self.display_sources_from_db():
+            return
         elif self.loaded_sources:
             self.display_sources_from_csv()
         else:
@@ -587,8 +747,9 @@ class GUI:
         self.display_edition()
         self.display_sources()
         self.display_category()
-        if self.db:
+        if self.db or self.target_db:
             self.display_tables()
+            self.display_groups()
         self.update_current_buttons()
         self.mw.mainloop()
 

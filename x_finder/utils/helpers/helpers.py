@@ -45,6 +45,8 @@ class Plate:
             return "soup"
         if self.content:
             return "content"
+        if self.item_links is not None:
+            return "links"
         return "empty"
 
 

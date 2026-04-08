@@ -1,7 +1,7 @@
 from time import time, sleep
 from multiprocessing import Pool
 from selector import Selector
-from helpers import Plate
+from helpers.helpers import Plate
 from datahandling import Dh
 
 
@@ -196,10 +196,10 @@ class SoupKitchen:
             return plate
         return None
 
-    def sort_sources_editions(self, plate: Plate, types: list[str] | None = None) -> None:
-        if not types:
-            types = ["rulebooks"]
-        self.H.parse_sources_editions(plate, self.editions, types=types)
+    def sort_sources_editions(self, plate: Plate, groups: list[str] | None = None) -> None:
+        if not groups:
+            groups = ["rulebooks"]
+        self.H.sort_sources(plate, self.editions, groups=groups)
 
     @staticmethod
     def clean_nav_links(nav_links) -> None:

@@ -2,7 +2,7 @@ import pandas as pd
 from gui import GUI
 from soupkitchen import SoupKitchen as Kitchen
 from tkinter import messagebox, END
-from helpers import Plate
+from helpers.helpers import Plate
 from tkinter import Event
 
 
@@ -57,7 +57,7 @@ class KitchenGraphic(GUI):
                                row=19, column=1, text="Normalize Source", bg='grey', default='disabled')
         self.initialize_button("fit_source_to_models_bt", command=self.fit_source_to_models,
                                row=20, column=1, text="Fit source to model", bg='grey', default='disabled')
-        self.initialize_button("sort_sources_bt", command=self.sort_sources(),
+        self.initialize_button("sort_sources_bt", command=self.sort_sources,
                                row=21, column=1, text="Sort Sources", bg='grey', default='disabled')
         self.initialize_button("update_provider_bt", command=self.update_provider,
                                row=30, column=7, text="Update Provider", bg='grey', default='disabled')
@@ -114,9 +114,58 @@ class KitchenGraphic(GUI):
         self.update_current_labels()
         self.update_current_buttons()
 
-    def db_to_plate(self, category: str, source: str, status: str):
-        df = self.db_to_df(category, source)
-        self.df_to_plate(df, category, source, status)
+    def db_to_plate(self,
+                    name: str | None = None,
+                    source: str | None = None,
+                    category: str | None = None,
+                    group: str | None = None,
+                    status: str | None = None):
+        db = self.db
+        if name is None and self.current_category:
+            name = self.current_category
+        if status == "unsorted":
+            db = self.target_db
+            status = "sources"
+            name = "sources"
+        else:
+            if source is None and self.current_source:
+                source = self.current_source
+            if category is None and self.current_category:
+                category = self.current_category
+            if group is None and self.current_group:
+                group = self.current_group
+
+        df = self.db_to_df(name=name, source=source, category=category, group=group, db=db)
+        self.use_my_dfs({status: df})
+
+    def use_my_dfs(self, dfs: dict[str, pd.DataFrame]) -> None:
+        links = None
+        status = None
+        df = None
+        keys = dfs.keys()
+        for key in keys:
+            if key == "links":
+                links = dfs[key]
+                if status is None:
+                    status = "links"
+            if key != "links":
+                status = key
+                df = dfs[key]
+        name = self.current_source + " " + self.current_category + " " + status
+        new_plate = Plate(name=name.strip(), category=self.current_category)
+        new_plate.item_links = links
+        if df is not None:
+            new_plate.dfs[status] = df
+            new_plate.data_dict[status] = df.to_dict(orient='records')
+            if status in ["completed", "normalized", "modeled"]:
+                new_plate.completed = True
+                if status != "completed":
+                    new_plate.normalized = True
+                    if status == "modeled":
+                        new_plate.modeled = True
+        self.current_plate = new_plate
+        self.update_current_labels()
+        self.update_current_buttons()
 
     def plate_to_db(self, plate: Plate, category: str | None = None) -> None:
         dfs = plate.dfs
@@ -128,7 +177,7 @@ class KitchenGraphic(GUI):
         elif category in dfs.keys():
             self.df_to_db(dfs[category], name)
         elif category in ["links", "sources"]:
-            self.df_to_db(plate.item_links, f"{category}")
+            self.df_to_db(plate.item_links, category)
 
     def df_to_plate(self,
                     df: pd.DataFrame,
@@ -142,6 +191,7 @@ class KitchenGraphic(GUI):
                 links = [{"name": row[1]["name"], "url": row[1]["url"]} for row in df.iterrows()]
                 new_plate.item_links[category] = links
             new_plate.dfs[category] = df
+
             if status in ["completed", "normalized", "modeled"]:
                 new_plate.completed = True
                 if status != "completed":
@@ -195,7 +245,7 @@ class KitchenGraphic(GUI):
 
         elif self.current_plate.content:
             self.__getattribute__("query_list").insert(END, "Content:", self.current_plate.content)
-        if self.current_plate.item_links:
+        if self.current_plate.item_links is not None:
             self.__getattribute__("query_list").insert(END, "Item Links:", self.current_plate.item_links)
         self.update_current_buttons()
 
@@ -278,10 +328,19 @@ class KitchenGraphic(GUI):
             self.__getattribute__("message_box").insert(END, '-- Index Not Found!--')
 
     def sort_sources(self) -> None:
+        if not self.current_plate or self.current_plate.item_links is None:
+            self.db_to_plate(name="sources", status="unsorted")
         if self.current_plate:
             self.kitchen.sort_sources_editions(self.current_plate)
             if self.current_plate.dfs:
-                self.df_to_db(self.current_plate.dfs[self.edition], "sources")
+                edition_df = self.current_plate.dfs[self.edition]
+                self.kitchen.H.normalizer.norm_df(edition_df, "sources", source_name=self.edition)
+                self.kitchen.H.normalizer.norm_sources_df(edition_df)
+                df = edition_df.applymap(str)
+                print(df.dtypes)
+                self.df_to_db(df, "sources")
+                self.df_to_db(self.current_plate.dfs["sources"], "sources", db=self.target_db)
+                self.df_to_db(self.current_plate.dfs["links"], "links")
                 self.update_display(message='-- Editions sorted!--')
             else:
                 self.update_display(message='-- Failed to sort editions!--')

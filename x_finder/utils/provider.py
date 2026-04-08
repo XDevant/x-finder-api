@@ -5,8 +5,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
 from args import Ica
-from helpers import Plate
+from helpers.helpers import Plate
 from typing import Iterable, Any
+from pandas import DataFrame
 
 
 class Provider:
@@ -51,8 +52,11 @@ class Provider:
             alert.accept()
         except selenium.common.NoAlertPresentException:
             div = self.driver.find_element(By.CLASS_NAME, "fc-consent-root")
-            button = div.find_element(By.CLASS_NAME, "fc-cta-consent")
-            button.click()
+            try:
+                button = div.find_element(By.CLASS_NAME, "fc-cta-consent")
+                button.click()
+            except selenium.common.exceptions.NoSuchElementException:
+                pass
 
     def extract_cookies(self) -> list[dict] | None:
         if self.driver:
@@ -93,10 +97,12 @@ class Provider:
         root = host.shadow_root
         shadow_content = root.find_element(By.ID, self.get("search_id"))
         table = shadow_content.find_element(By.TAG_NAME, self.get("search_tag"))
-        links = table.find_elements(By.TAG_NAME, "a")
-        plate.item_links["sources"] = [{"name": link.text, "url": link.get_attribute("href")} for link in links]
-        table_html = table.get_attribute("outerHTML")
-        plate.content = table_html
+        raw_links = table.find_elements(By.TAG_NAME, "a")
+        links = [{"name": link.text, "url": link.get_attribute("href")} for link in raw_links]
+        if links:
+            plate.item_links = DataFrame.from_records(links)
+            table_html = table.get_attribute("outerHTML")
+            plate.content = table_html
 
     def get_page_content(self, plate: Plate) -> None:
         content = self.driver.page_source
@@ -151,9 +157,9 @@ class Provider:
             parser = self.parser
         if plate.url:
             self.get_content(plate, keep_alive=keep_alive)
+            self.extract_plate_name_and_category(plate)
             if plate.content:
                 plate.soup = self.cook_from_html(plate.content, parser)
-                self.extract_plate_name_and_category(plate)
 
     @staticmethod
     def request_contents(url: str) -> None | bytes:

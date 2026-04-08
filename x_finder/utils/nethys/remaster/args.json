@@ -6,7 +6,7 @@
     "app": "utils",
     "host_tag": "nethys-search",
     "search_id": "results",
-    "search_title": "table",
+    "search_tag": "table",
 
     "nav_id": "main",
     "main_id": "main",
@@ -42,12 +42,17 @@
     "app": "core",
     "start": "</h1><b>",
     "text_columns": ["latest_errata", "product_line", "release_date"],
-    "url_columns": ["product_page"]
+    "url_columns": ["product_page"],
+    "model_columns": ["name", "group", "category", "release_date", "errata_date",
+                      "errata_version", "nethys_url", "paizo_url"]
   },
   "actions": {
     "app": "core",
-    "text_columns": ["source", "traits", "action", "trigger", "prerequisite", "requirements", "cost", "critical_success", "success", "failure", "critical_failure"],
-    "model_columns": ["name", "subtype", "nethys_url", "traits", "action", "trigger", "prerequisite", "requirements", "critical_success", "success", "failure", "critical_failure", "cost", "source", "source_page", "description", "x_finder_related_item"],
+    "text_columns": ["source", "traits", "action", "trigger", "prerequisite", "requirements", "cost",
+                     "critical_success", "success", "failure", "critical_failure"],
+    "model_columns": ["name", "subtype", "nethys_url", "traits", "action", "trigger", "prerequisite", "requirements",
+                      "critical_success", "success", "failure", "critical_failure", "cost", "source", "source_page",
+                      "description", "x_finder_related_item"],
     "nested": true
   },
   "ancestries": {
@@ -114,14 +119,15 @@
   },
   "classes": {
     "app": "core",
-    "text_columns": ["source", "key_ability", "hit_points", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "initial_proficiencies", "perception", "saving_throws", "skills", "attacks", "defenses", "spells", "class_dc", "class_features"],
-    "model_columns": ["name", "nethys_url", "key_ability", "alternate_key_ability", "hit_points", "perception", "fortitude", "reflex", "will", "skill_1", "skill_2", "free_skills", "unarmed_attacks", "simple_weapons", "martial_weapons", "advanced_weapons", "single_weapons", "unarmored_defense", "light_armor", "medium_armor", "heavy_armor", "spells", "class_dc", "class_features", "source", "source_page", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "description"]
+    "cell_ends": ["b", "hr", "h1", "h2", "h3", "table", "div", "i"],
+    "text_columns": ["source", "key_attribute", "hit_points", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "initial_proficiencies", "perception", "saving_throws", "skills", "attacks", "defenses", "spells", "class_dc"],
+    "model_columns": ["name", "nethys_url", "key_attribute", "alternate_key_attribute", "hit_points", "perception", "fortitude", "reflex", "will", "skill_1", "skill_2", "free_skills", "unarmed_attacks", "simple_weapons", "martial_weapons", "advanced_weapons", "single_weapons", "unarmored_defense", "light_armor", "medium_armor", "heavy_armor", "spells", "class_dc", "class_features", "source", "source_page", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "description"]
   },
   "class_features": {
     "app": "core",
-    "text_columns": [],
+    "text_columns": ["level"],
     "model_excluded_columns": ["nethys_url"],
-    "cell_starts": [],
+    "cell_starts": ["h2"],
     "cell_ends": ["b", "hr", "h1", "h2", "h3", "table", "div"],
     "next_titles": ["h1", "h2"],
     "nested": true
@@ -243,7 +249,7 @@
     "model_excluded_columns": ["name", "nethys_url"],
     "overload": true,
     "nested": true,
-    "cell_starts": ["b"],
+    "cell_starts": ["b", "h2"],
     "cell_ends": ["b", "hr", "h1", "h2", "h3"],
     "desc_tags": ["b", "u", "i", "ol", "ul"]
   },

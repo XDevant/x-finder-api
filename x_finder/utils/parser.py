@@ -1,7 +1,7 @@
 from utils import U
 from args import Ica
 from typing import Iterable
-from helpers import Plate, Result, Status
+from helpers.helpers import Plate, Result, Status
 from reader import Reader
 from bs4.element import Tag
 
@@ -59,7 +59,7 @@ class Parser:
             next_tag = title.next_sibling
             status.start = next_tag
 
-            if len(title_content) >= expected_length:
+            if len(title_content) >= max(expected_length, 2):
                 text = title_content[1]
                 if "action" in text:
                     title_dict['action'] = text
@@ -166,6 +166,8 @@ class Parser:
                         if current_category not in nested_rows.keys():
                             nested_rows[current_category] = []
                         nested_rows[current_category].append(title)
+            elif debug:
+                print(title)
 
         if verbose:
             for title in result.titles:
@@ -189,7 +191,11 @@ class Parser:
 
     @staticmethod
     def clean_name(name: str) -> str:
-        return name.split('(')[0].strip()
+        return name.split('(')[0].strip("{} ,;)[]'")
+
+    @staticmethod
+    def clean_link_name(name: str) -> str:
+        return name.strip("{} ,;[]'").replace('(', '')
 
     @staticmethod
     def validate_title(title: dict[str, str], result: Result) -> bool:
@@ -212,11 +218,12 @@ class Parser:
         if "sources" not in plate.data_dict.keys():
             return sorted_dict
         for row in plate.data_dict["sources"]:
-            edition = self.get_edition(row, editions)
+            edition = self.get_edition(row)
+            row["edition"] = edition
             sorted_dict[edition].append(row)
         return sorted_dict
 
-    def get_edition(self, row, editions):
+    def get_edition(self, row: dict):
         remaster_start_year = self.get("start_date")
         release = "0"
         errata = "0"
@@ -264,7 +271,7 @@ class Parser:
         category_data = []
         flags = []
         for item in item_list:
-            name = item.get_text()
+            name = self.clean_link_name(item.get_text())
             url = item['href']
             if not name or not url:
                 continue
@@ -280,7 +287,10 @@ class Parser:
                 continue
 
             item_dict["category"] = item_category
-            item_dict["check"] = item_category in self.get("", keys=True)
+            if item_category in self.get("", keys=True):
+                item_dict["status"] = "ok"
+            else:
+                item_dict["status"] = "ko"
             flags.append(item_dict["url"])
             category_data.append(item_dict)
         return category_data
