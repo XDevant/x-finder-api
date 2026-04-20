@@ -120,11 +120,12 @@ class U:
             return ""
 
     @staticmethod
-    def clean(value):
+    def clean(value) -> str:
         clean_value = BeautifulSoup(value, 'html.parser')
         if clean_value:
             text = clean_value.get_text()
             return text.strip()
+        return ""
 
     @staticmethod
     def format_column_name(name, url=False):

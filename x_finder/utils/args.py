@@ -10,8 +10,7 @@ class Ica:
             return ica[category][argument]
         if argument in ica["default"].keys():
             return ica["default"][argument]
-        return None
-
+        return ""
 
 item_category_arguments = {"default": {
     "base_url": "ex: https://2e.aonprd.com/",

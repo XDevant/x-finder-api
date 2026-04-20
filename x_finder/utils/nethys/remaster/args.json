@@ -15,15 +15,16 @@
     "title_class": "title",
 
     "row_start": "a",
-    "cell_starts": ["b"],
-    "cell_ends": ["b", "br", "hr", "h1", "h2", "h3", "table"],
-    "next_titles": ["h1", "h2", "h3"],
+    "start_tags": ["b"],
+    "end_tags": ["b", "br", "hr", "h1", "h2", "h3", "table"],
+    "title_tags": ["h1", "h2", "h3"],
     "desc_tags": ["a", "u", "i", "ol", "ul"],
     "overload": false,
     "item_url_column": "name",
     "text_columns": [],
     "check_columns": [],
     "url_columns": [],
+    "nested_columns": [],
     "nested": false,
     "subtype": "",
     "name_nest": "",
@@ -35,8 +36,10 @@
     "cell_separator": "</b>",
     "tail_start": "<br>",
     "traits": false,
+
     "model_columns": ["name", "nethys_url", "source", "source_page", "description"],
-    "model_excluded_columns": []
+    "model_excluded_columns": [],
+    "through_columns": []
   },
   "sources": {
     "app": "core",
@@ -61,9 +64,9 @@
     "model_columns": ["name", "nethys_url", "traits", "hit_points", "size", "speed", "ability_boosts", "ability_flaw", "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma", "free_boosts", "languages", "augmented_sense", "augmented_description", "special", "you_might...", "others_probably...", "physical_description", "society", "alignment_and_religion", "adventurers", "names", "sample_names", "source", "source_page", "description"],
     "nested_pairs": ["augmented_sense", "augmented_description", "special", "special"],
     "row_start": "a",
-    "cell_starts": ["b", "h1", "h2", "h3"],
-    "cell_ends": ["h1", "h2", "h3", "i"],
-    "next_titles": []
+    "start-tags": ["b", "h1", "h2", "h3"],
+    "end_tags": ["h1", "h2", "h3", "i"],
+    "title_tags": []
   },
   "armor": {
     "app": "core",
@@ -119,7 +122,7 @@
   },
   "classes": {
     "app": "core",
-    "cell_ends": ["b", "hr", "h1", "h2", "h3", "table", "div", "i"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div", "i"],
     "text_columns": ["source", "key_attribute", "hit_points", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "initial_proficiencies", "perception", "saving_throws", "skills", "attacks", "defenses", "spells", "class_dc"],
     "model_columns": ["name", "nethys_url", "key_attribute", "alternate_key_attribute", "hit_points", "perception", "fortitude", "reflex", "will", "skill_1", "skill_2", "free_skills", "unarmed_attacks", "simple_weapons", "martial_weapons", "advanced_weapons", "single_weapons", "unarmored_defense", "light_armor", "medium_armor", "heavy_armor", "spells", "class_dc", "class_features", "source", "source_page", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "description"]
   },
@@ -127,9 +130,9 @@
     "app": "core",
     "text_columns": ["level"],
     "model_excluded_columns": ["nethys_url"],
-    "cell_starts": ["h2"],
-    "cell_ends": ["b", "hr", "h1", "h2", "h3", "table", "div"],
-    "next_titles": ["h1", "h2"],
+    "start_tags": ["h2"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],
+    "title_tags": ["h1", "h2"],
     "nested": true
   },
   "class_kits": {
@@ -141,13 +144,13 @@
     "app": "core",
     "text_columns": ["level"],
     "model_excluded_columns": ["nethys_url"],
-    "cell_ends": ["b", "hr", "h1", "h2", "h3", "table", "div"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],
     "nested": true
   },
   "class_samples": {
     "app": "core",
-    "next_titles": [],
-    "cell_starts": ["b", "h2"],
+    "title_tags": [],
+    "start_tags": ["b", "h2"],
     "overload": true,
     "subtype": "class",
     "text_columns" : ["source", "ability_scores", "skills", "starting_feat", "higher_level_feats"],
@@ -249,8 +252,8 @@
     "model_excluded_columns": ["name", "nethys_url"],
     "overload": true,
     "nested": true,
-    "cell_starts": ["b", "h2"],
-    "cell_ends": ["b", "hr", "h1", "h2", "h3"],
+    "start_tags": ["b", "h2"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3"],
     "desc_tags": ["b", "u", "i", "ol", "ul"]
   },
   "languages": {
@@ -273,7 +276,7 @@
     "app": "core",
     "text_columns": ["source", "traits", "cr", "recall_knowledge", "unspecific_lore", "specific_lore", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "speed"],
     "model_columns": ["name", "nethys_url", "traits", "cr", "recall_knowledge_skill", "skill_dc", "unspecific_lore_dc", "specific_lore_dc", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "speed", "source", "source_page", "description"],
-    "next_titles": ["h3"]
+    "title_tags": ["h3"]
   },
   "monster_abilities": {
     "app": "core",
@@ -310,7 +313,8 @@
   "research_fields": {
     "app": "core",
     "text_columns": ["source"],
-    "model_columns": ["name", "nethys_url", "source", "source_page", "description"]},
+    "model_columns": ["name", "nethys_url", "source", "source_page", "description"]
+  },
   "rituals": {
     "app": "core",
     "text_columns": ["source", "traits", "level", "cast", "cost", "secondary_casters", "primary_check", "secondary_checks", "range", "target", "area", "critical_success", "success", "failure", "critical_failure", "heightened"],
@@ -331,14 +335,14 @@
     "app": "core",
     "text_columns": ["source"],
     "model_columns": ["name", "nethys_url", "ability", "source", "source_page", "description"],
-    "next_titles": ["h1", "h3"],
+    "title_tags": ["h1", "h3"],
     "subtype": "ability"
   },
   "skills_general": {
     "app": "core",
     "text_columns": ["source"],
     "model_columns": ["name", "nethys_url", "prerequisite", "source", "source_page", "description"],
-    "next_titles": ["h1", "h2", "h3"],
+    "title_tags": ["h1", "h2", "h3"],
     "subtype": "prerequisite"
   },
   "skill_uses": {
@@ -346,9 +350,9 @@
     "text_columns": [],
     "model_columns": [],
     "model_excluded_columns": ["name", "nethys_url"],
-    "next_titles": ["h1", "h2", "h3"],
-    "cell_starts": ["a", "b", "u"],
-    "cell_ends": ["a", "b", "u", "h1", "h2", "h3"],
+    "title_tags": ["h1", "h2", "h3"],
+    "start_tags": ["a", "b", "u"],
+    "end_tags": ["a", "b", "u", "h1", "h2", "h3"],
     "overload": true,
     "nested": true
   },
@@ -386,7 +390,7 @@
 },
   "critical_specialization_effects": {
     "app": "core",
-    "nested_pairs": ["weapon_group", "effect"],
+    "nested_columns": ["weapon_group", "effect"],
     "model_columns": ["name", "effect", "source", "source_page"],
     "nested": true
   }

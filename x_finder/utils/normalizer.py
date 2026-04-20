@@ -1,17 +1,25 @@
 from utils import U
 from args import Ica
 from pandas import DataFrame
-from typing import Iterable
 
 
 class Normalizer:
     def __init__(self, target: str, edition: str) -> None:
         self.target: str = target
         self.edition: str = edition
-        self.ica: dict[str, dict[str, str]] | None = None
+        self.ica: dict[str, dict[str, str | list[str]]] = {}
 
-    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
-        return Ica.get(self.ica, argument, category, keys)
+    def sica(self, argument: str, category: str = "default") -> str:  # subtype, name_nest
+        arguments = Ica.get(self.ica, argument, category=category)
+        if isinstance(arguments, str):
+            return arguments
+        return ""
+
+    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # text_columns
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, list):
+            return arguments
+        return []
 
     @staticmethod
     def split_text_column(df: DataFrame, name: str, new_name: str, separator: str = ' ', strip: str = ' ') -> None:
@@ -37,12 +45,12 @@ class Normalizer:
                     axis=1)
 
     def norm_df(self, df: DataFrame, key: str, source_name: str) -> DataFrame:
-        subtype = self.get("subtype", key)
-        name_nest = self.get("name_nest", key)
+        subtype = self.sica("subtype", category=key)
+        name_nest = self.sica("name_nest", category=key)
         self.split_text_column(df, "name", name_nest, separator='[', strip=' ]')
         self.split_text_column(df, "name", subtype, separator='(', strip=' )')
         if "level" in df.columns:
-            if "spell_type" in self.get("text_columns", key):
+            if "spell_type" in self.lica("text_columns", category=key):
                 df["spell_type"] = df.apply(
                     lambda r: r["level"].split(' ')[0].strip(),
                     axis=1)

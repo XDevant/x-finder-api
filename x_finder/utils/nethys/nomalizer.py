@@ -18,7 +18,7 @@ class TargetNormalizer(Normalizer):
                 axis=1)
         df["release_date"] = df.apply(lambda r: U.translate_date(str(r["release_date"])), axis=1)
         df["errata_date"] = df.apply(
-            lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else None,
+            lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else "-",
             axis=1)
         df["errata_version"] = df.apply(
             lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",

@@ -45,7 +45,9 @@ class SQL:
         return self.actions[self.action] + self.table + " (" + ", ".join(typed_cols) + ")" + ";"
 
     def stringify_insert(self) -> str:
-        return self.actions[self.action] + self.table + self.values_ph + ";"
+        if self.values_ph:
+            return self.actions[self.action] + self.table + self.values_ph + ";"
+        return ""
 
     def stringify_delete(self) -> str:
         return self.actions[self.action] + self.table + self.where + ";"
@@ -61,14 +63,16 @@ class SQL:
         return self.get()
 
     @staticmethod
-    def prettyfy(value: str | bool | int) -> str:
-        if type(value) == str:
+    def prettyfy(value: str | bool | int) -> str | bool | int:
+        if isinstance(value, str):
             return "'" + value + "'"
         return value
 
     def add_column_type(self) -> list[str]:
         table_name = self.table.strip()
         typed_cols = []
+        if self.columns is None:
+            return []
         for column in self.columns:
             if column == "name" and table_name != "links":
                 typed_cols.append(f"'{column}' TEXT UNIQUE ON CONFLICT REPLACE")

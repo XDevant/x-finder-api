@@ -1,7 +1,7 @@
 import pandas as pd
 from gui import GUI
 from soupkitchen import SoupKitchen as Kitchen
-from tkinter import messagebox, END
+from tkinter import END
 from helpers.helpers import Plate
 from tkinter import Event
 
@@ -12,68 +12,31 @@ class KitchenGraphic(GUI):
     links_to_csv = False
     completed_to_csv = True
     normalized_to_csv = False
+    kitchen: Kitchen | None = None
 
     def __init__(self) -> None:
         super().__init__()
-        self.kitchen: Kitchen | None = None
         self.base_url: str | None = None
         self.current_plate: Plate | None = None
-        self.initialize_command_buttons()
-        self.initialize_plate_labels()
 
     def load_target_input(self, event: Event) -> None:
         super().load_inbox_input(event)
         target, edition = self.path.split('/')[-2:]
         self.kitchen = Kitchen(target, edition)
-        self.base_url = self.kitchen.H.get("base_url")
+        if self.kitchen is not None:
+            self.base_url = str(self.kitchen.H.sica("base_url"))
         self.update_label('url_lb', f"Url :{self.base_url}")
 
     def initialize_path(self, target: str | None = None, edition: str | None = None) -> None:
         super().initialize_path(target=target, edition=edition)
         if self.target and self.edition:
             self.kitchen = Kitchen(target, edition)
-            self.base_url = self.kitchen.H.get("base_url")
-            self.update_label('url_lb', f"Url: {self.base_url}")
-            self.__getattribute__("message_box").insert(END, f'-- Kitchen for {self.target} {self.edition} ready--')
+        if self.kitchen is not None:
+            self.base_url = str(self.kitchen.H.sica("base_url"))
+            self.update_label('title_url_label', f"Url: {self.base_url}")
+            self.__getattribute__("message_box").insert(END, f'-- Kitchen   for {self.target} {self.edition} ready--')
             self.__getattribute__("message_box").insert(END, f'-- Found {self.base_url} for site base url --')
             self.update_current_buttons()
-
-    def initialize_command_buttons(self) -> None:
-        self.initialize_button("extract_sources_bt", command=self.extract_sources,
-                               row=12, column=1, text=" Extract Sources ", bg='grey', default='disabled')
-        self.initialize_button("cook_url_bt", command=self.cook_url,
-                               row=13, column=1, text=" Cook  Url ", bg='grey', default='disabled')
-        self.initialize_button("parse_item_bt", command=self.parse_item,
-                               row=14, column=1, text="Parse Item", bg='grey', default='disabled')
-        self.initialize_button("parse_category_bt", command=self.parse_category,
-                               row=15, column=1, text="Parse category", bg='grey', default='disabled')
-        self.initialize_button("normalize_category_bt", command=self.normalize_category,
-                               row=16, column=1, text="Normalize Category", bg='grey', default='disabled')
-        self.initialize_button("fit_category_to_model_bt", command=self.fit_category_to_model,
-                               row=17, column=1, text="Fit category to Model", bg='grey', default='disabled')
-        self.initialize_button("parse_source_bt", command=self.parse_source,
-                               row=18, column=1, text="Parse Source", bg='grey', default='disabled')
-        self.initialize_button("normalize_source_bt", command=self.normalize_source,
-                               row=19, column=1, text="Normalize Source", bg='grey', default='disabled')
-        self.initialize_button("fit_source_to_models_bt", command=self.fit_source_to_models,
-                               row=20, column=1, text="Fit source to model", bg='grey', default='disabled')
-        self.initialize_button("sort_sources_bt", command=self.sort_sources,
-                               row=21, column=1, text="Sort Sources", bg='grey', default='disabled')
-        self.initialize_button("update_provider_bt", command=self.update_provider,
-                               row=30, column=7, text="Update Provider", bg='grey', default='disabled')
-        self.initialize_button("update_parser_bt", command=self.update_parser,
-                               row=30, column=8, text="Update Parser", bg='grey', default='disabled')
-        self.initialize_button("update_normalizer_bt", command=self.update_normalizer,
-                               row=30, column=10, text="Update Parser", bg='grey', default='disabled')
-        self.initialize_button("update_modeler_bt", command=self.update_modeler,
-                               row=30, column=11, text="Update Modeler", bg='grey', default='disabled')
-
-    def initialize_plate_labels(self) -> None:
-        self.initialize_label("plate_lb", row=9, column=14)
-        self.initialize_label("plate_name_lb", row=10, column=14)
-        self.initialize_label("plate_url_lb", row=11, column=14)
-        self.initialize_label("plate_category_lb", row=12, column=14)
-        self.initialize_label("plate_status_lb", row=13, column=14)
 
     def update_current_buttons(self) -> None:
         super(KitchenGraphic, self).update_current_buttons()
@@ -91,10 +54,11 @@ class KitchenGraphic(GUI):
                 if self.current_plate.dfs and self.current_category in self.current_plate.dfs.keys():
                     self.update_button("normalize_category", color="green", default='normal')
             if self.current_plate.dfs:
-                self.update_button("normalize_source", color="green", default='normal')
+                self.update_button("normalize_selection", color="green", default='normal')
         if self.current_source:
-            self.update_button("parse_source", "green")
+            self.update_button("parse_selection", "green")
         if self.kitchen:
+            self.update_button("update_ica", "green")
             self.update_button("update_provider", "green")
             self.update_button("update_parser", "green")
             self.update_button("update_normalizer", "green")
@@ -102,11 +66,11 @@ class KitchenGraphic(GUI):
 
     def update_current_labels(self) -> None:
         super(KitchenGraphic, self).update_current_labels()
-        self.update_label("plate_name_lb", f"Name: {self.current_plate.name if self.current_plate else '-'}")
-        self.update_label("plate_url_lb", f"Url: {self.current_plate.url if self.current_plate else '-'}")
-        self.update_label("plate_category_lb",
+        self.update_label("plate_name_label", f"Name: {self.current_plate.name if self.current_plate else '-'}")
+        self.update_label("plate_url_label", f"Url: {self.current_plate.url if self.current_plate else '-'}")
+        self.update_label("plate_category_label",
                           f"Category: {self.current_plate.category if self.current_plate else '-'}")
-        self.update_label("plate_status_lb", f"Status: {self.current_plate.status() if self.current_plate else '-'}")
+        self.update_label("plate_status_label", f"Status: {self.current_plate.status() if self.current_plate else '-'}")
 
     def update_display(self, message: str = "") -> None:
         if message:
@@ -114,40 +78,80 @@ class KitchenGraphic(GUI):
         self.update_current_labels()
         self.update_current_buttons()
 
+    def check_plate(self, status: str) -> bool:
+        if self.current_plate is None:
+            return False
+        return self.current_plate.check(status, category=self.current_category, source=self.current_source)
+
+    def get_plate(self, status: str) -> Plate | None:
+        if self.check_plate(status):
+            return self.current_plate
+        if status in ["unsorted", "links", "soup", "normalized", "modeled"]:
+            self.db_to_plate(status=status)
+            if self.check_plate(status):
+                return self.current_plate
+        self.csv_to_plate(status=status)
+        if self.check_plate(status):
+            return self.current_plate
+        return None
+
+    def csv_to_plate(self, status: str) -> None:
+        if status:
+            name = f"{self.current_category}__{status}.csv"
+            df = self.load_csv(name)
+            self.use_my_dfs({status: df})
+
     def db_to_plate(self,
-                    name: str | None = None,
+                    item: str | None = None,
                     source: str | None = None,
                     category: str | None = None,
                     group: str | None = None,
-                    status: str | None = None):
+                    status: str | None = None) -> None:
         db = self.db
-        if name is None and self.current_category:
-            name = self.current_category
+        dfs = {}
+        if status is None:
+            return None
         if status == "unsorted":
             db = self.target_db
-            status = "sources"
-            name = "sources"
-        else:
-            if source is None and self.current_source:
-                source = self.current_source
-            if category is None and self.current_category:
-                category = self.current_category
-            if group is None and self.current_group:
-                group = self.current_group
-
-        df = self.db_to_df(name=name, source=source, category=category, group=group, db=db)
-        self.use_my_dfs({status: df})
+            df = self.db_to_df(name="sources", filters={"item": item, "group": group}, db=db)
+            dfs["unsorted"] = df
+        elif status in "links soups":
+            filters = {"item": item, "source": source, "category": category, "group": group}
+            if status == "links":
+                filters["soups"] = "No soups"
+            if status == "soups":
+                filters["NOT soups"] = "No soups"
+            item_links = self.db_to_df(name="links",
+                                       filters=filters,
+                                       db=db)
+            dfs["links"] = item_links
+        elif status in "normalized modeled":
+            if category is not None:
+                df = self.get_category_df(item=item, source=source, category=category, group=group, status=status)
+                if df is not None:
+                    dfs[category] = df
+            else:
+                for category in self.get_category_list(source=source, group=group, status=status):
+                    df = self.get_category_df(item=item, source=source, category=category, group=group, status=status)
+                    if df is not None:
+                        dfs[category] = df
+        if category == "sources" and item:
+            item_links = self.db_to_df(name="links",
+                                       filters={"item": item, "source": source, "category": category, "group": group},
+                                       db=db)
+            dfs["links"] = item_links
+        if dfs:
+            self.use_my_dfs(dfs)
+        return None
 
     def use_my_dfs(self, dfs: dict[str, pd.DataFrame]) -> None:
         links = None
-        status = None
+        status = ""
         df = None
         keys = dfs.keys()
         for key in keys:
             if key == "links":
                 links = dfs[key]
-                if status is None:
-                    status = "links"
             if key != "links":
                 status = key
                 df = dfs[key]
@@ -155,8 +159,8 @@ class KitchenGraphic(GUI):
         new_plate = Plate(name=name.strip(), category=self.current_category)
         new_plate.item_links = links
         if df is not None:
-            new_plate.dfs[status] = df
-            new_plate.data_dict[status] = df.to_dict(orient='records')
+            new_plate.dfs = {status:  df}
+            new_plate.data_dict = {status: df.to_dict(orient='records')}
             if status in ["completed", "normalized", "modeled"]:
                 new_plate.completed = True
                 if status != "completed":
@@ -169,45 +173,28 @@ class KitchenGraphic(GUI):
 
     def plate_to_db(self, plate: Plate, category: str | None = None) -> None:
         dfs = plate.dfs
-        name = category + "__" + plate.status()
-
+        if dfs is None:
+            return
         if category is None:
             for key, value in dfs:
                 self.df_to_db(value, f"{key}__{plate.status()}")
         elif category in dfs.keys():
+            name = category + "__" + plate.status()
             self.df_to_db(dfs[category], name)
-        elif category in ["links", "sources"]:
+        elif category in ["links", "sources"] and plate.item_links is not None:
             self.df_to_db(plate.item_links, category)
 
-    def df_to_plate(self,
-                    df: pd.DataFrame,
-                    category: str,
-                    source: str | None = None,
-                    status: str | None = None) -> None:
-
-        new_plate = Plate(name=source, category=category)
-        if category:
-            if "name" in df.columns and "url" in df.columns:
-                links = [{"name": row[1]["name"], "url": row[1]["url"]} for row in df.iterrows()]
-                new_plate.item_links[category] = links
-            new_plate.dfs[category] = df
-
-            if status in ["completed", "normalized", "modeled"]:
-                new_plate.completed = True
-                if status != "completed":
-                    new_plate.normalized = True
-                    if status == "modeled":
-                        new_plate.modeled = True
-        self.current_plate = new_plate
-        self.update_current_labels()
-        self.update_current_buttons()
-        self.display_plate()
-
     def cook_url(self) -> None:
+        if self.kitchen is None:
+            return
         self.clear_message_box()
         self.current_plate = None
         if self.current_url:
-            plate = self.kitchen.cook_url(self.current_url, keep_alive=False)
+            link = {"name": self.current_item,
+                    "url": self.current_url,
+                    "source": self.current_source,
+                    "category": self.current_category}
+            plate = self.kitchen.cook_url(link, keep_alive=False)
             self.__getattribute__("message_box").insert(END, f'-- Plate provided --')
             if plate.soup:
                 self.current_plate = plate
@@ -218,7 +205,25 @@ class KitchenGraphic(GUI):
             self.__getattribute__("message_box").insert(END, f'-- No Url to cook, click one --')
         self.update_current_buttons()
 
+    def cook_urls(self) -> None:
+        if self.kitchen is None:
+            return
+        if not self.current_plate or self.current_plate.item_links is None:
+            self.db_to_plate(group=self.current_group,
+                             source=self.current_source,
+                             category=self.current_category,
+                             status="links")
+        if self.current_plate and self.current_plate.item_links is not None:
+            self.kitchen.cook_urls(self.current_plate)
+            self.plate_to_db(self.current_plate, category="links")
+            self.clear_query_lists()
+            if self.current_plate.dfs:
+                self.iterate_dfs_display()
+            self.update_display()
+
     def display_plate(self) -> None:
+        if self.current_plate is None:
+            return
         self.clear_query_lists()
         self.__getattribute__("query_name_list").insert(END, self.current_plate.name)
         self.__getattribute__("query_url_list").insert(END, self.current_plate.url)
@@ -251,13 +256,14 @@ class KitchenGraphic(GUI):
 
     def parse_item(self) -> None:
         plate = self.current_plate
-        if plate:
-            if self.current_plate.category == "sources":
+        if plate is not None and self.kitchen is not None:
+            if plate.category == "sources":
                 self.kitchen.extract_source_links(plate,
                                                   debug=self.debug,
                                                   verbose=self.verbose,
                                                   to_csv=self.links_to_csv)
-                self.plate_to_db(plate, "links")
+                self.plate_to_db(plate,
+                                 category="links")
             self.kitchen.parse_item(plate,
                                     debug=self.debug,
                                     verbose=self.verbose)
@@ -274,14 +280,14 @@ class KitchenGraphic(GUI):
             self.update_display()
 
     def parse_category(self) -> None:
-        if not self.current_category:
-            self.__getattribute__("message_box").insert(END, '-- No category selected--')
+        if not self.current_category or self.kitchen is None:
+            self.__getattribute__("message_box").insert(END, '-- No category/edition selected--')
             return
-        check = self.current_plate and self.current_category in self.current_plate.item_links.keys()
-        if check:
-            message = f'-- Parsing {self.current_category} for {self.current_plate.name} --'
+        plate = self.current_plate
+        if plate is not None and plate.item_links is not None and self.current_category in plate.item_links.keys():
+            message = f'-- Parsing {self.current_category} for {plate.name} --'
             self.__getattribute__("message_box").insert(END, message)
-            self.kitchen.parse_category(self.current_plate,
+            self.kitchen.parse_category(plate,
                                         self.current_category,
                                         debug=self.debug,
                                         verbose=self.verbose)
@@ -289,12 +295,11 @@ class KitchenGraphic(GUI):
         else:
             file_name = self.current_source + '\\' + self.current_category + "__links_ok.csv"
             try:
-                links_from_csv = self.load_csv(file_name)
+                links_from_csv = pd.read_csv(file_name, delimiter='|')
                 if not links_from_csv.empty:
-                    print(links_from_csv)
                     link_plate = Plate(name=f"{self.current_source}")
                     link_plate.category = self.current_category
-                    link_plate.item_links = {self.current_category: links_from_csv.to_dict('records')}
+                    link_plate.item_links = links_from_csv
                     self.__getattribute__("message_box").insert(END, f'-- Csv found for {self.current_category} --')
                     self.kitchen.parse_category(link_plate,
                                                 self.current_category,
@@ -308,12 +313,14 @@ class KitchenGraphic(GUI):
                     self.__getattribute__("message_box").insert(END, f'-- {file_name} Not Found!--')
 
     def parse_source(self) -> None:
-        if self.current_plate and self.current_plate.item_links:
+        if self.current_plate and self.current_plate.item_links is not None and self.kitchen is not None:
             self.kitchen.parse_all_category(self.current_plate, debug=self.debug, verbose=self.verbose)
 
     def extract_sources(self) -> None:
+        if self.kitchen is None:
+            return
         plate = self.kitchen.extract_sources()
-        if plate:
+        if plate is not None:
             plate.category = "sources"
             self.current_plate = plate
             self.current_item = plate.name
@@ -322,25 +329,28 @@ class KitchenGraphic(GUI):
             self.current_url = plate.url
             self.update_display(message='-- Sources Extracted!--')
             self.display_plate()
-            self.df_to_db(plate.dfs["sources"], "sources", db=self.target_db)
-            self.df_to_db(plate.item_links, "groups", db=self.target_db)
+            if plate.dfs is not None:
+                self.df_to_db(plate.dfs["sources"], name="sources", db=self.target_db)
+            if plate.item_links is not None:
+                self.df_to_db(plate.item_links, name="groups", db=self.target_db)
         else:
             self.__getattribute__("message_box").insert(END, '-- Index Not Found!--')
 
     def sort_sources(self) -> None:
+        if self.kitchen is None:
+            return
         if not self.current_plate or self.current_plate.item_links is None:
-            self.db_to_plate(name="sources", status="unsorted")
+            self.db_to_plate(group=self.current_group, status="unsorted")
         if self.current_plate:
             self.kitchen.sort_sources_editions(self.current_plate)
             if self.current_plate.dfs:
                 edition_df = self.current_plate.dfs[self.edition]
-                self.kitchen.H.normalizer.norm_df(edition_df, "sources", source_name=self.edition)
+                self.kitchen.H.normalizer.norm_df(edition_df, key="sources", source_name=self.edition)
                 self.kitchen.H.normalizer.norm_sources_df(edition_df)
                 df = edition_df.applymap(str)
-                print(df.dtypes)
-                self.df_to_db(df, "sources")
-                self.df_to_db(self.current_plate.dfs["sources"], "sources", db=self.target_db)
-                self.df_to_db(self.current_plate.dfs["links"], "links")
+                self.df_to_db(df, name="sources")
+                self.df_to_db(self.current_plate.dfs["sources"], name="sources", db=self.target_db)
+                self.df_to_db(self.current_plate.dfs["links"], name="links")
                 self.update_display(message='-- Editions sorted!--')
             else:
                 self.update_display(message='-- Failed to sort editions!--')
@@ -349,25 +359,48 @@ class KitchenGraphic(GUI):
             self.__getattribute__("message_box").insert(END, '-- Plate Not Found!--')
 
     def normalize_category(self) -> None:
-        pass
+        if self.kitchen is None:
+            return
+        if self.current_plate is None or not self.check_plate(status="completed"):
+            return
+        self.kitchen.normalize_df(plate=self.current_plate,
+                                  category=self.current_category,
+                                  source=self.current_source)
 
     def normalize_source(self) -> None:
-        pass
+        if self.kitchen is None:
+            return
+        if self.current_plate is None or not self.check_plate(status="completed"):
+            return
+        self.kitchen.normalize_dfs(plate=self.current_plate,
+                                   source=self.current_source)
 
     def fit_category_to_model(self) -> None:
-        pass
+        if self.kitchen is None:
+            return
+        if self.current_plate is None or not self.check_plate(status="normalized"):
+            return
+        self.kitchen.fit_category_to_model(plate=self.current_plate,
+                                           category=self.current_category,
+                                           source=self.current_source)
 
     def fit_source_to_models(self) -> None:
-        pass
+        if self.kitchen is None:
+            return
+        if self.current_plate is None or not self.check_plate(status="normalized"):
+            return
+        self.kitchen.fit_source_to_model(plate=self.current_plate,
+                                         source=self.current_source)
 
     def iterate_dfs_display(self) -> None:
-        if self.current_category:
-            self.display_category_df(self.current_category)
-        category = next(self.current_plate.dfs.__iter__())
-        if category != self.current_category:
-            self.display_category_df(category)
+        if self.current_plate is None or self.current_plate.dfs is None:
+            return
+        for category in self.current_plate.dfs.keys():
+            self.display_df(self.current_plate.dfs[category])
 
     def display_category_df(self, category: str) -> None:
+        if self.current_plate is None or self.current_plate.dfs is None:
+            return
         if category not in self.current_plate.dfs.keys():
             self.__getattribute__("message_box").insert(END, f'-- No df found in plate for {category}--')
             return
@@ -377,8 +410,13 @@ class KitchenGraphic(GUI):
             self.__getattribute__("query_name_list").insert(END, row_list[0])
             self.__getattribute__("query_url_list").insert(END, row_list[1])
             if len(row_list) >= 2:
-                cleared_list = [str(row) for row in row_list[2:]]
+                cleared_list = [str(cell) for cell in row_list[2:]]
                 self.__getattribute__("query_list").insert(END, ' | '.join(cleared_list))
+        return
+
+    def update_ica(self):
+        if self.kitchen is not None:
+            self.kitchen.reload_ica()
 
     def update_provider(self) -> None:
         if self.kitchen:
@@ -404,13 +442,3 @@ class KitchenGraphic(GUI):
 if __name__ == "__main__":
     gui = KitchenGraphic()
     gui.run()
-"""
-                response = messagebox.askyesnocancel(title='Save Soup as Plate.csv?',
-                                                     message='Save soup in csv with yes answer,no save in db or cancel')
-                if response is None:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' extracted --")
-                elif response is True:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in csv--")
-                else:
-                    self.__getattribute__("message_box").insert(END, f"-- {self.current_plate.name}' content in db--")
-"""

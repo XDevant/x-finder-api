@@ -1,6 +1,5 @@
 from utils import U
 from args import Ica
-from typing import Iterable
 from helpers.helpers import Plate, Result, Status
 from reader import Reader
 from bs4.element import Tag
@@ -10,22 +9,45 @@ class Parser:
     def __init__(self, target: str, edition: str) -> None:
         self.target: str = target
         self.edition: str = edition
-        self.ica: dict[str, dict[str, str]] | None = None
-        self.reader: Reader | None = None
+        self.ica: dict[str, dict[str, str | list[str]]] = {}
+        self.reader: Reader = Reader()
 
-    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
-        return Ica.get(self.ica, argument, category, keys)
+    def sica(self, argument: str, category: str = "default") -> str:  # main_id, title_id, title_tag, title_class
+        arguments = Ica.get(self.ica, argument, category=category)
+        if isinstance(arguments, str):
+            return arguments
+        return ""
+
+    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # text_columns
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, list):
+            return arguments
+        return []
+
+    def bica(self, argument: str, category: str = "default", keys: bool = False) -> bool:  # nested
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, bool):
+            return arguments
+        return False
+
+    def intca(self, argument: str, category: str = "default", keys: bool = False) -> int:  # start_date
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, int):
+            return arguments
+        return 0
 
     def validate_plate(self, plate: Plate) -> None:
-        main_id = self.get("main_id")
+        main_id = self.sica("main_id")
         if plate.soup and plate.soup.find(id=main_id):
             plate.validated = True
 
     def find_titles(self, plate: Plate, debug: bool = False, verbose: bool = False) -> list[Tag]:
-        main_id = self.get("main_id")
-        title_id = self.get("title_id")
-        title_tag = self.get("title_tag")
-        title_class = self.get("title_class")
+        main_id = self.sica("main_id")
+        title_id = self.sica("title_id")
+        title_tag = self.sica("title_tag")
+        title_class = self.sica("title_class")
+        if plate.soup is None:
+            return []
         main = plate.soup.find(id=main_id)
         if title_id:
             titles = main.find_all(id=title_id)
@@ -46,7 +68,7 @@ class Parser:
         title_dict = {"plate_name": plate.name,
                       "x_finder_model": plate.category}
         expected_length = 1
-        end = "level" in self.get("text_columns", plate.category)
+        end = "level" in self.lica("text_columns", plate.category)
         end_found = not end
         if end:
             expected_length += 1
@@ -81,12 +103,15 @@ class Parser:
                 link = title_links[0]
                 title_dict["url"] = link['href']
             else:
-                title_dict["url"] = plate.url
+                if plate.url:
+                    title_dict["url"] = plate.url
+                else:
+                    title_dict["url"] = ""
 
             if not end_found and not title_links:
                 next_text = next_tag.get_text()
                 if next_text:
-                    title_dict["description"] = [next_text]
+                    title_dict["description"] += [next_text]
                 if debug:
                     print("Possible fake title spotted")
                 continue
@@ -114,7 +139,7 @@ class Parser:
             return parsed_rows
         action_list = parsed_rows["actions"]
         plate_item = parsed_rows[plate.category][0]
-        name = self.clean_name(plate_item["name"])
+        name = self.clean_name(str(plate_item["name"]))
         trained = False
         if "(Trained)" in plate_item["name"]:
             trained = True
@@ -122,18 +147,23 @@ class Parser:
             if " Trained Actions" in action["name"]:
                 trained = True
             if trained:
-                if "prerequisite" not in action.keys():
-                    action["prerequisite"] = []
+                action_prq = []
+                if isinstance(action["prerequisite"], str):
+                    action_prq.append(action["prerequisite"])
+                if isinstance(action["prerequisite"], list):
+                    action_prq.append(action["prerequisite"])
                 if plate.category == "skills":
-                    action["prerequisite"].append(f"Trained in {name}")
+                    action_prq.append(f"Trained in {name}")
                 else:
-                    action["prerequisite"].append("Trained in related skill")
+                    action_prq.append("Trained in related skill")
+
+                action["prerequisite"] = action_prq
         return parsed_rows
 
     def parse_item(self,
                    plate: Plate,
-                   status: Status = None,
-                   result: Result = None,
+                   status: Status,
+                   result: Result,
                    debug: bool = False,
                    verbose: bool = False
                    ) -> dict[str, list[dict[str, str]]]:
@@ -162,7 +192,7 @@ class Parser:
                     title["x_finder_related_item"] = related_item
                     title["x_finder_related_model"] = plate.category
 
-                    if self.get("nested", current_category) and self.validate_nested_title(title, current_category):
+                    if self.bica("nested", current_category) and self.validate_nested_title(title, current_category):
                         if current_category not in nested_rows.keys():
                             nested_rows[current_category] = []
                         nested_rows[current_category].append(title)
@@ -211,8 +241,10 @@ class Parser:
                 return False
         return True
 
-    def sort_sources(self, plate: Plate, editions: list[str]) -> [list, list]:
+    def sort_sources(self, plate: Plate, editions: list[str]) -> dict[str, dict[str, str]]:
         sorted_dict = {}
+        if plate.data_dict is None:
+            return sorted_dict
         for edition in editions:
             sorted_dict[edition] = []
         if "sources" not in plate.data_dict.keys():
@@ -224,7 +256,7 @@ class Parser:
         return sorted_dict
 
     def get_edition(self, row: dict):
-        remaster_start_year = self.get("start_date")
+        remaster_start_year = self.intca("start_date")
         release = "0"
         errata = "0"
         if "release_date" in row.keys() and row["release_date"]:
@@ -287,7 +319,7 @@ class Parser:
                 continue
 
             item_dict["category"] = item_category
-            if item_category in self.get("", keys=True):
+            if item_category in self.lica("", keys=True):
                 item_dict["status"] = "ok"
             else:
                 item_dict["status"] = "ko"
@@ -306,7 +338,7 @@ class Parser:
             if not main:
                 main = plate.soup.find(id=ica_id).find('nethys-search')
                 print(main)
-                if main:
+                if main and not isinstance(main, int):
                     print("found table")
                     main = main.find_all('td', recursive=True)
                     if not main:
@@ -318,11 +350,12 @@ class Parser:
             nav_links = []
             for node in main:
                 print(node)
-                links = node.find_all('a', recursive=True)
-                if links:
-                    nav_list = [{"name": link.get_text(), "url": link['href']} for link in links]
-                    self.clean_links(nav_list)
-                    nav_links += nav_list
+                if isinstance(node, Tag):
+                    links = node.find_all('a', recursive=True)
+                    if links:
+                        nav_list = [{"name": link.get_text(), "url": link['href']} for link in links]
+                        self.clean_links(nav_list)
+                        nav_links += nav_list
             if nav_links:
                 print("links extracted")
                 return nav_links

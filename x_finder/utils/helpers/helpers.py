@@ -1,3 +1,4 @@
+from typing import Any
 from pandas import DataFrame
 from bs4.element import Tag
 
@@ -15,18 +16,18 @@ class Plate:
                  title: str = "Plate",
                  name: str = "unknown",
                  category: str = "default",
-                 content: bytes | None = None,
+                 content: bytes | str | None = None,
                  soup: Tag | None = None
                  ) -> None:
         self.url: str | None = url
         self.title: str = title
-        self.content: bytes | None = content
+        self.content: bytes | str | None = content
         self.soup: Tag | None = soup
         self.name: str = name
         self.category: str = category
         self.item_links: DataFrame | None = None
-        self.data_dict: dict[str | None, list[dict[str | None, str]]] = {}
-        self.dfs: dict[str | None, DataFrame] = {}
+        self.data_dict: dict[str, list[dict[str, Any]]] | None = None
+        self.dfs: dict[str, DataFrame] | None = None
         self.validated: bool = False
         self.completed: bool = False
         self.normalized: bool = False
@@ -41,13 +42,77 @@ class Plate:
             return "completed"
         if self.validated:
             return "validated"
-        if self.soup:
+        if self.soup is not None:
             return "soup"
-        if self.content:
+        if self.content is not None:
             return "content"
         if self.item_links is not None:
             return "links"
         return "empty"
+
+    def check(self, status: str, category: str = None, source: str = None) -> bool:
+        """
+        checks if the data expected by status is in the Plate. category and source being used as filters
+        usage: if false is returned to a button command, the command will load missing data from db/csv
+        """
+        completion = status
+        if completion in ["normalized", "modeled"]:
+            completion = "completed"
+        match completion:
+            case "soup":
+                return self.soup is not None
+            case "content":
+                return self.content is not None
+            case "links":
+                df = self.item_links
+                if df is not None and not df.empty:
+                    filtered_df = self.filter_df(df, category=category, source=source)
+                    return not filtered_df.empty
+                return False
+            case "completed":
+                dfs = self.dfs
+                if dfs is None or not self.__getattribute__(status):
+                    return False
+                filtered_dfs = self.filter_dfs(dfs, category=category, source=source)
+                if filtered_dfs:
+                    return True
+                return False
+            case _:
+                return False
+
+    def filter_dfs(self,
+                   dfs: dict[str, DataFrame],
+                   category: str = None,
+                   source: str = None
+                   ) -> dict[str, DataFrame]:
+        filtered_dfs = {}
+        if category is None:
+            for key,df in dfs.items():
+                key_df = self.filter_df(dfs[key], source=source)
+                if not key_df.empty:
+                    filtered_dfs[key] = key_df
+            return filtered_dfs
+        else:
+            if category in dfs.keys():
+                category_df = self.filter_df(dfs[category], source=source)
+                if not category_df.empty:
+                    filtered_dfs[category] = category_df
+        return filtered_dfs
+
+
+    @staticmethod
+    def filter_df(df: DataFrame, category: str = None, source: str = None) -> DataFrame:
+        if category is None and source is None:
+            return df
+        if category is None:
+            if "source" in df.columns:
+                return df[ df["source"] == source ]
+        if source is not None:
+            if category in df.columns:
+                category_df = df[ df["category"] == category ]
+                return category_df[ category_df["source"] == source ]
+        return df[ df["category"] == category ]
+
 
 
 class Status:

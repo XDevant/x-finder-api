@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
 from args import Ica
 from helpers.helpers import Plate
-from typing import Iterable, Any
+from typing import Any
 from pandas import DataFrame
 
 
@@ -20,15 +20,18 @@ class Provider:
     def __init__(self, target: str, edition: str, parser: str | None = None):
         self.target = target
         self.edition = edition
-        self.ica: dict[str, dict[str, str]] | None = None
+        self.ica: dict[str, dict[str, str | list[str]]] = {}
         if parser in self.parsers:
             self.parser = parser
         self.options: webdriver.ChromeOptions = self.get_driver_options()
         self.driver: webdriver.Chrome | None = None
         self.cookies: list[dict[str, Any]] | None = None
 
-    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str]:
-        return Ica.get(self.ica, argument, category, keys)
+    def sica(self, argument: str, category: str = "default") -> str:  # base_url, host_tag, search_id, search_tag
+        arguments = Ica.get(self.ica, argument, category=category)
+        if isinstance(arguments, str):
+            return arguments
+        return ""
 
     @staticmethod
     def get_driver_options() -> webdriver.ChromeOptions:
@@ -42,10 +45,13 @@ class Provider:
         driver.get(url)
 
     def teardown(self) -> None:
-        self.driver.quit()
-        self.driver = None
+        if self.driver is not None:
+            self.driver.quit()
+            self.driver = None
 
     def accept_cookies(self) -> None:
+        if self.driver is None:
+            return
         wait = WebDriverWait(self.driver, timeout=4)
         try:
             alert = wait.until(lambda d: d.switch_to.alert)
@@ -58,14 +64,15 @@ class Provider:
             except selenium.common.exceptions.NoSuchElementException:
                 pass
 
-    def extract_cookies(self) -> list[dict] | None:
+    def extract_cookies(self) -> list[dict]:
         if self.driver:
             cookies = self.driver.get_cookies()
             return cookies
+        return []
 
     def store_cookies(self, cookies: list[dict] | None) -> None:
         if cookies:
-            home = self.get("base_url")
+            home = self.sica("base_url")
             domain = home.split('//')[-1].strip(' /')
             self.cookies = cookies
             print(*cookies)
@@ -76,8 +83,8 @@ class Provider:
                 self.driver.add_cookie(cookie)
 
     def say_hello(self):
-        home = self.get("base_url")
-        if home:
+        home = self.sica("base_url")
+        if home and self.driver is not None:
             self.get_page(home)
             self.accept_cookies()
             cookies = self.extract_cookies()
@@ -85,6 +92,7 @@ class Provider:
             title = self.driver.title
             self.teardown()
             return title
+        return ""
 
     @staticmethod
     def check_shadow_dom(url: str) -> bool:
@@ -93,24 +101,26 @@ class Provider:
         return False
 
     def get_shadow_dom_links(self, plate: Plate) -> None:
-        host = self.driver.find_element(By.TAG_NAME, self.get("host_tag"))
-        root = host.shadow_root
-        shadow_content = root.find_element(By.ID, self.get("search_id"))
-        table = shadow_content.find_element(By.TAG_NAME, self.get("search_tag"))
-        raw_links = table.find_elements(By.TAG_NAME, "a")
-        links = [{"name": link.text, "url": link.get_attribute("href")} for link in raw_links]
-        if links:
-            plate.item_links = DataFrame.from_records(links)
-            table_html = table.get_attribute("outerHTML")
-            plate.content = table_html
+        if self.driver is not None:
+            host = self.driver.find_element(By.TAG_NAME, self.sica("host_tag"))
+            root = host.shadow_root
+            shadow_content = root.find_element(By.ID, self.sica("search_id"))
+            table = shadow_content.find_element(By.TAG_NAME, self.sica("search_tag"))
+            raw_links = table.find_elements(By.TAG_NAME, "a")
+            links = [{"name": link.text, "url": link.get_attribute("href")} for link in raw_links]
+            if links:
+                plate.item_links = DataFrame.from_records(links)
+                table_html = table.get_attribute("outerHTML")
+                plate.content = table_html
 
     def get_page_content(self, plate: Plate) -> None:
-        content = self.driver.page_source
-        plate.content = content
+        if self.driver is not None:
+            content = self.driver.page_source
+            plate.content = content
 
     def get_content(self, plate: Plate, keep_alive: bool = False) -> None:
         url = plate.url
-        if url:
+        if url and self.driver is not None:
             self.get_page(url)
             title = self.driver.title
             plate.title = title
@@ -129,7 +139,7 @@ class Provider:
 
     def get_page(self, url: str):
         if not url.startswith("https://"):
-            url = self.get("base_url") + url
+            url = self.sica("base_url") + url
         if not self.driver:
             self.setup(url)
         else:
@@ -146,14 +156,14 @@ class Provider:
                 plate.category = category_parts[0].lower().strip('):,;. ').replace(' ', '_')
 
     @staticmethod
-    def cook_from_html(html, parser: str) -> BeautifulSoup:
+    def cook_from_html(html: str | bytes, parser: str) -> BeautifulSoup:
         raw_soup = BeautifulSoup(html, parser)
         return raw_soup
 
     def cook(self, plate: Plate, parser: str = 'auto', keep_alive: bool = False):
         if parser in self.parsers:
             parser = parser
-        else:
+        elif self.parser is not None:
             parser = self.parser
         if plate.url:
             self.get_content(plate, keep_alive=keep_alive)

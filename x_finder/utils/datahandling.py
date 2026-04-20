@@ -9,42 +9,39 @@ from normalizer import Normalizer
 from modeler import Modeler
 from reader import Reader
 from x_finder.x_finder.settings import BASE_DIR
-from typing import Iterable
 from helpers.helpers import Plate, Status, Result
-from importlib import reload, invalidate_caches
+from importlib import reload, invalidate_caches, import_module
 
 """Df is not supposed to do much but provide base methods and hooks for each handler that will inherit from Df """
 
 
 class Dh:
-    """Here we parse the item's data, check for nested item's and turn navigable strings into rows of data
-     then we build a panda dataframe for each category of items and normalize them for data tidying
+    """Here we parse the item's data, check for nested item's and turn navigable strings into rows of data.
+     We build a panda dataframe for each category of items and normalize them for data tidying
      and make sure our dfs match our database models and extract tables through.
      """
     def __init__(self, target="", edition=""):
         self.target: str = target
         self.edition: str = edition
-        self.ica: dict[str, dict[str, str]] | None = None
-        self.provider: Provider | None = None
-        self.parser: Parser | None = None
-        self.normalizer: Normalizer | None = None
-        self.modeler: Modeler | None = None
+        self.ica: dict[str, dict[str, str | list[str]]] = {}
+        self.provider: Provider = Provider(self.target, self.edition)
+        self.parser: Parser = Parser(self.target, self.edition)
+        self.normalizer: Normalizer = Normalizer(self.target, self.edition)
+        self.modeler: Modeler = Modeler(self.target, self.edition)
         self.path: str = f"{BASE_DIR}\\utils\\"
         self.load_ica()
-        self.instantiate_provider()
-        self.instantiate_parser()
-        self.instantiate_normalizer()
-        self.instantiate_modeler()
+        self.dispatch_ica()
 
     def instantiate_provider(self) -> None:
         self.provider = Provider(self.target, self.edition)
         self.provider.ica = self.ica
 
     def instantiate_parser(self) -> None:
-        self.parser = Parser(self.target, self.edition)
-        self.parser.reader = Reader()
-        self.parser.ica = self.ica
-        self.parser.reader.ica = self.ica
+        parser = Parser(self.target, self.edition)
+        parser.reader = Reader()
+        parser.ica = self.ica
+        parser.reader.ica = self.ica
+        self.parser = parser
 
     def instantiate_normalizer(self) -> None:
         self.normalizer = Normalizer(self.target, self.edition)
@@ -77,8 +74,11 @@ class Dh:
         self.modeler.ica = self.ica
         self.parser.reader.ica = self.ica
 
-    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str]:
-        return Ica.get(self.ica, argument, category, keys)
+    def sica(self, argument: str, category: str = "default") -> str:  # index_url, nav_id, title_tag
+        arguments = Ica.get(self.ica, argument, category=category)
+        if isinstance(arguments, str):
+            return arguments
+        return ""
 
     @staticmethod
     def save(df, name: str, directory: str | None = None, app: str = "utils") -> None:
@@ -112,6 +112,8 @@ class Dh:
         if db is None:
             file = f"{self.target}_{self.edition}.db"
             db = self.build_path(file, data=True)
+        if db is None:
+            return False
         with lite.connect(db) as con:
             try:
                 df.to_sql(name=name, con=con, if_exists='append', index=False)
@@ -186,15 +188,20 @@ class Dh:
     """
 
     def extract_source_links(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
+        if plate.soup is None:
+            return
         unsorted_links = self.parser.extract_source_links(plate.soup)
         links = self.parser.parse_source_links(unsorted_links, plate.name)
         df = pd.DataFrame.from_records(data=links)
         df["source"] = plate.name
+        df["soup"] = "No soup"
         plate.item_links = df
         if verbose or debug:
             print(plate.item_links)
 
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
+        if plate.url is None:
+            return
         status = Status(plate.name, plate.url)
         result = Result()
         titles = self.parser.find_titles(plate, debug=debug, verbose=verbose)
@@ -230,9 +237,9 @@ class Dh:
         We do not care about list data since we will go after detail data for each item.
         The plate will hold a data_dict we build here with the item_links names and urls we got from the provider.
         """
-        url = self.get("index_url")
-        plate = self.cook_url(url, keep_alive=True)
-        link_list = self.parser.extract_links_by_id(plate, self.get("nav_id"), self.get("title_tag"))
+        url = self.sica("index_url")
+        plate = self.cook_url(str(url), keep_alive=True)
+        link_list = self.parser.extract_links_by_id(plate, str(self.sica("nav_id")), str(self.sica("title_tag")))
         if not link_list:
             return None
         df = pd.DataFrame.from_records(data=link_list)
@@ -240,57 +247,40 @@ class Dh:
         plate.item_links = df
         unsorted_list = []
         for source_group in link_list:
-            group_plate = self.cook_url(source_group["url"], keep_alive=True)
-            if group_plate.item_links is not None:
-                group_plate.item_links["group"] = source_group["name"]
-                group_plate.item_links["edition"] = "unsorted"
-                unsorted_list.append(group_plate.item_links)
+            if source_group is not None:
+                group_plate = self.cook_url(source_group["url"], keep_alive=True)
+                if group_plate.item_links is not None:
+                    group_plate.item_links["group"] = source_group["name"]
+                    group_plate.item_links["edition"] = "unsorted"
+                    unsorted_list.append(group_plate.item_links)
         if unsorted_list:
-            plate.dfs["sources"] = pd.concat(unsorted_list)
-            plate.data_dict["sources"] = plate.dfs["sources"].to_dict(orient='records')
+            data = pd.concat(unsorted_list)
+            plate.dfs = {"sources": data}
+            data_dict = {"sources": data.to_dict(orient='records')}
+            plate.data_dict = {str(key): value for key, value in data_dict.items()}
             plate.completed = True
             return plate
         return None
 
-    def sort_sources(self,
-                     source_plate: Plate,
-                     editions: list[str],
-                     groups: list[str] | None = None,
-                     ) -> None:
-        """ We want to sort our sources by release date or if exist errata date extracted from detail source pages
-        We need to parse older pages with a legacy kitchen, using heritage to slightly change our code and ica data.
-        """
-        source_list = source_plate.data_dict["sources"]
-        for edition in editions:
-            source_plate.data_dict[edition] = []
-        links = []
-        for source in source_list:
-            group = source["group"]
-            if not groups or group.lower() in groups:
-                plate = self.cook_url(source["url"], keep_alive=True)
-                self.parse_item(plate)
-                source_data = plate.data_dict["sources"][0]
-                edition = self.parser.get_edition(source_data)
-                source_plate.data_dict[edition].append(source_data)
-                if edition == self.edition:
-                    self.extract_source_links(plate)
-                    links.append(plate.item_links)
-        source_plate.dfs["links"] = pd.concat(links)
-        for key, value in source_plate.data_dict.items():
-            df = pd.DataFrame.from_records(data=value)
-            print(df.head(), df.columns)
-            source_plate.dfs[key] = df
-            source_plate.completed = True
+    def sort_source(self, source: dict[str, str]) -> dict:
+        plate = self.cook_url(source["url"], keep_alive=True)
+        self.parse_item(plate)
+        if plate.data_dict is None:
+            return {}
+        row = plate.data_dict["sources"][0]
+        data = {"row": row, "edition": self.parser.get_edition(row), "soup": plate.soup}
+        if data["edition"] == self.edition:
+            self.extract_source_links(plate)
+            data["df"] = plate.item_links
+        return data
 
-    def say_hello(self) -> [str, bool]:
+    def say_hello(self) -> tuple[str, bool]:
         title = self.provider.say_hello()
         return title, self.provider.cookies is not None
 
-    def normalize_dfs(self, plate: Plate, source_name: str) -> None:
-        for category in plate.dfs.keys():
-            self.normalize_df(plate, category, source_name=source_name)
-
     def normalize_df(self, plate: Plate, category: str, source_name: str) -> None:
+        if plate.dfs is None:
+            return
         df = plate.dfs[category]
         self.normalizer.norm_df(df, category, source_name=source_name)
         try:
@@ -298,15 +288,18 @@ class Dh:
         except AttributeError:
             pass
 
-    def fit_category_to_models(self, plate: Plate, category: str) -> None:
+    def fit_category_to_models(self, plate: Plate, category: str, source: str) -> None:
+        if plate.dfs is None:
+            return
         model_dfs = self.modeler.fit_category_to_models(plate.dfs[category], category)
         if model_dfs:
-            directory = self.target + '\\' + self.edition
+            directory = self.target + '\\' + self.edition + '\\' + source
             for model in model_dfs.keys():
-                self.save(model_dfs[model], f"{model}__finalized", directory=directory, app="utils")
+                self.save(model_dfs[model], name=f"{model}__finalized", directory=directory, app="utils")
 
     def update_worker(self, worker: str) -> None:
-        reload(self.__getattribute__(worker))
+        module = import_module(worker)
+        reload(module.__getattribute__(f"Edition{worker.title()}"))
         invalidate_caches()
         self.__getattribute__(f"instantiate_{worker}")()
 

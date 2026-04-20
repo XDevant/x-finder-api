@@ -1,9 +1,11 @@
+from typing import Callable, Any
+
 from nethys.selector import EditionSelector as NethysSelector
 from datahandling import Dh
 
 
 class Selector:
-    handlers = {"nethys": NethysSelector}
+    handlers: dict[str, Callable[[str, str], Any]] = {"nethys": NethysSelector}
     targets = []
     editions = []
     handler = None
@@ -17,14 +19,15 @@ class Selector:
         self.targets = list(self.handlers.keys())
         if target in self.targets:
             selector = self.handlers[target](target, edition)
-            self.handler = selector.handler
-            self.editions = list(selector.handlers.keys())
+            if selector is not None:
+                self.handler = selector.handler
+                self.editions = list(selector.handlers.keys())
             if edition in self.editions:
                 self.validated = True
 
     def handler_selector(self, target: str, edition: str) -> Dh:
         if target in self.handlers.keys():
-            return self.handlers[target][0](target, edition)
+            return self.handlers[target](target, edition).handler
         return Dh(target, edition)
 
 

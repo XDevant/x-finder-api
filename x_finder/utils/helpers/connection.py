@@ -29,7 +29,7 @@ class Con:
             columns: list[str] | None = None,
             wheres: list[str] | None = None,
             values: tuple | None = None
-            ) -> (list, list):
+            ) -> tuple[list, list]:
         headers = []
         rows_list = []
         if self.db is None or not self.db:

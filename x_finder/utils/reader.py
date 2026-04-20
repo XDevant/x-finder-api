@@ -1,4 +1,4 @@
-from typing import Literal, Iterable
+from typing import Literal
 from bs4.element import Tag
 from helpers.helpers import Status, Result
 from utils import U
@@ -7,20 +7,35 @@ from args import Ica
 
 class Reader:
     def __init__(self):
-        self.ica: dict[str, dict[str, str]] | None = None
+        self.ica: dict[str, dict[str, str | list[str]]] = {}
 
-    def get(self, argument: str, category: str = "default", keys: bool = False) -> str | Iterable[str] | bool | int:
-        return Ica.get(self.ica, argument, category, keys)
+    def sica(self, argument: str, category: str = "default") -> str:  # end_tags, title_tags, start_tags
+        arguments = Ica.get(self.ica, argument, category=category)
+        if isinstance(arguments, str):
+            return arguments
+        return ""
+
+    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # tex_columns, chk_cols, nested_columns, description_tags
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, list):
+            return arguments
+        return []
+
+    def bica(self, argument: str, category: str = "default", keys: bool = False) -> bool:  # nested, no_description, overload
+        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
+        if isinstance(arguments, bool):
+            return arguments
+        return False
 
     def read_soup(self,
-                  child: Tag | None | str,
+                  child: Tag | None,
                   status: Status,
                   result: Result,
                   category: str,
                   debug: bool = False,
                   verbose: bool = False) -> None:
         if child is None:
-            return  # block stop
+            return None # block stop
 
         current_category = "default"
         if 'x_finder_model' in result.titles[status.ended].keys():
@@ -28,9 +43,9 @@ class Reader:
 
         value = U.clean_text(child.get_text())   # we deal with the results we have before taking care of the data
         if current_category == "default":  # We are in an unidentified empty title we store on main item title[0] first
-            store_time = child.name and child.name in self.get("cell_ends", category)
+            store_time = child.name and child.name in self.sica("end_tags", category)
         else:  # We will store current or first, deciding witch in the store method
-            store_time = child.name and child.name in self.get("cell_ends", current_category)
+            store_time = child.name and child.name in self.sica("end_tags", current_category)
         steal_time = result.titles[status.ended]["name"] in ["Activate", "Melee", "Ranged"] and not status.loaded_values
 
         if status.last_key and store_time:  # we have all the values for that key.
@@ -43,7 +58,7 @@ class Reader:
 
         key, tail = U.format_key(child)
         href = U.get_href(child)
-        check_text_col = key and key in self.get("text_columns", category) + self.get("text_columns", current_category)
+        check_text_col = key and key in self.lica("text_columns", category) + self.lica("text_columns", current_category)
         hint = self.analyse_status_and_tag(child, status, current_category, key)  # return expected command in most case
         if debug:
             print(key, "tail:", tail, "hint:", hint, check_text_col)
@@ -63,12 +78,12 @@ class Reader:
                     self.add_new_title(child, result, status, nested_category)
                 elif status.family:  # this url holds several items of the same family
                     self.add_new_title(child, result, status, category)
-                else:  # We open a empty title, setting current_category to default, useful to escape
+                else:  # We open an empty title, setting current_category to default, useful to escape
                     self.add_new_title(child, result, status)
             case "new_key":
                 nested_category = self.find_nested_item_category(key, href, child.next_sibling, category)
                 check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
-                if self.get("nested", current_category) and check_text_col and check_nest:
+                if self.bica("nested", current_category) and check_text_col and check_nest:
                     if key in result.titles[status.ended].keys() and nested_category == current_category:
                         print("key stolen")
                         check_text_col = False
@@ -80,9 +95,9 @@ class Reader:
                         self.describe(value, result, index=index)
                 elif not check_text_col:  # check overload for key_terms?
                     self.add_new_title(child, result, status, category=nested_category)
-                    if key in self.get("text_columns", nested_category):
+                    if nested_category is not None and key in self.lica("text_columns", nested_category):
                         self.load_key_value(status, key, tail)
-                else:  # normal behaviour
+                else:  # normal behavior
                     self.load_key_value(status, key, tail)
             case "dive":
                 next_child = child.next_element
@@ -125,7 +140,7 @@ class Reader:
                         values.append(value)
                 if values:
                     index = status.ended
-                    if self.get("no_description", current_category):
+                    if self.bica("no_description", current_category):
                         index = 0
                     if "description" not in result.titles[index].keys():
                         result.titles[index]["description"] = []
@@ -144,14 +159,14 @@ class Reader:
                 else:
                     if child.name == "h2" and "Elite | Normal | Weak" in description:
                         description = ""
-                    if child.name == "h1" and "cr" in self.get("text_columns", category) and "Creature" in description:
+                    if child.name == "h1" and "cr" in self.lica("text_columns", category) and "Creature" in description:
                         result.titles[0]["cr"] = description.split("Creature")[-1]
                         description = ""
                     if description:
                         if child.name in ["h1", "h2", "h3", "h4"]:
                             description = "<b>" + description + "</b>"
                         index = status.ended
-                        if self.get("no_description", current_category):
+                        if self.bica("no_description", current_category):
                             index = 0
                         self.describe(description, result, index=index)
 
@@ -159,16 +174,17 @@ class Reader:
             next_child = child.next_sibling
             if next_child:
                 try:
-                    return self.read_soup(child.next_sibling,
-                                          status,
-                                          result,
-                                          category,
-                                          debug=debug,
-                                          verbose=verbose)
+                    self.read_soup(child.next_sibling,
+                                   status,
+                                   result,
+                                   category,
+                                   debug=debug,
+                                   verbose=verbose)
                 except RecursionError:
                     pass
                 except StopIteration:
                     pass
+                return None
         if status.last_key and status.loaded_values:
             self.store(status, result, category, current_category)
         return None
@@ -181,7 +197,7 @@ class Reader:
                       name: str = None
                       ) -> None:
         """
-        :param child: NavigableString the html child we try to extract data from
+        :param child: NavigableString the HTML child we try to extract data from
         :param result: the instance of Result for the current item
         :param status: the instance of Status that keeps track of the steps during item parsing
         :param category: String, the category of the item we parse
@@ -217,9 +233,9 @@ class Reader:
                     result.titles[status.ended]["url"] = status.url
 
             if 'level' not in result.titles[status.ended].keys():
-                if 'level' in self.get("text_columns", category) and len(title_parts) > 1:
+                if 'level' in self.lica("text_columns", category) and len(title_parts) > 1:
                     result.titles[status.ended]['level'] = title_parts[-1]
-            if 'action' in self.get("text_columns", category):
+            if 'action' in self.lica("text_columns", category):
                 try:
                     result.titles[status.ended]['action'] = child.find('span').get_text(' ,;')
                 except AttributeError:
@@ -258,21 +274,21 @@ class Reader:
             return "equipment_activations"
         if name.endswith("_tasks") and name.startswith("sample_"):
             return "sample_tasks"
-        name_model = self.get("", name)
+        name_model = self.sica("", name)
         url_base = url.split('.')[0].strip().lower().replace(' ', '_').replace('-', '_')
-        url_model = self.get("", url_base)
+        url_model = self.sica("", url_base)
         if next_child is not None and next_child.get_text():
             next_text = next_child.get_text()
             if next_text:
                 next_text = next_text.lower().strip(' (),;').replace(' ', '_')
                 if not next_text.endswith('s'):
                     next_text += 's'
-                next_model = self.get("", next_text)
-                if next_model not in ["rules", "default"]:
+                next_model = self.sica("", next_text)
+                if next_model not in ["rules", "default", None]:
                     return next_model
-        if url_model is not None and url_model not in ["rules", "default"]:
+        if url_model is not None and url_model not in ["rules", "default", None]:
             return url_model
-        if name_model != "default":
+        if name_model != "default" and name_model is not None:
             return name_model
         return ""
 
@@ -303,22 +319,22 @@ class Reader:
         if status.last_key:
             return "load"  # we have a key from a previous child, we look for its values
         if child.name:
-            if child.name in self.get("next_titles", current_category):
+            if child.name in self.lica("title_tags", current_category):
                 if key:
                     return "new_title"  # so we no longer have a key we look for nested items or family of items
                 return ""
-            if child.name in self.get("cell_starts", current_category):
+            if child.name in self.lica("start_tags", current_category):
                 if key:
                     return "new_key"  # or for a key
             if child.name == 'span' and "class" in child.attrs:
                 if "hanging-indent" in child.attrs["class"]:
                     return "dive"
-                return "trait"  # many to many data, like promos certifications etc..;
+                return "trait"  # many to many data, like promos certifications etc...;
             if child.name == "table":
                 return "table"  # that we will more securely crawl in sub method
             if child.name in ["div", "details"] or "rules%" in child.name:
                 return "dive"  # we will recursively parse its children
-        if child.name in self.get("desc_tags", current_category) or child.name is None:
+        if child.name in self.lica("desc_tags", current_category) or child.name is None:
             return "describe"
         return ""
 
@@ -361,9 +377,9 @@ class Reader:
 
     def get_check_column_index(self, status: Status, key: str, category: str, current_category: str) -> int:
         index = -1
-        if key in self.get("check_columns", current_category):  # the value of a check col is True if key
+        if key in self.lica("check_columns", current_category):  # the value of a check col is True if key
             index = status.ended
-        if key in self.get("check_columns", category):
+        if key in self.lica("check_columns", category):
             index = 0
         return index
 
@@ -378,13 +394,13 @@ class Reader:
         key = status.last_key
         values = [value for value in status.loaded_values if value.replace('\\n', '').strip()]
         match = False
-        text_cols = self.get("text_columns", category)
+        text_cols = self.lica("text_columns", category)
         if key in text_cols or key.split('_')[0] in text_cols:
             match = True
             if key not in result.titles[0].keys() and (not status.family or category != current_category):
                 result.titles[0][key] = values
                 return
-        current_text_cols = self.get("text_columns", current_category)
+        current_text_cols = self.lica("text_columns", current_category)
         if key in current_text_cols:
             if key not in result.titles[status.ended].keys():
                 result.titles[status.ended][key] = values
@@ -401,7 +417,7 @@ class Reader:
             if name == result.titles[status.ended]['x_finder_model']:
                 result.titles[status.ended]["name"] = key
             category = result.titles[status.ended]['x_finder_model']
-            nested_cols = self.get("nested_pairs", category)
+            nested_cols = self.lica("nested_columns", category)
             if nested_cols:
                 nested_number = len(nested_cols) // 2
                 for i in range(nested_number):
@@ -409,7 +425,7 @@ class Reader:
                         result.titles[status.ended][nested_cols[2 * i]] = key
                         result.titles[status.ended][nested_cols[2 * i + 1]] = values
                         return
-        if self.get("overload", current_category):
+        if self.bica("overload", current_category):
             result.titles[status.ended][key] = values
             return
         result.parsed.append({key: values})
