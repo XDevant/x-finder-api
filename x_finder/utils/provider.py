@@ -4,13 +4,13 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
-from args import Ica
 from helpers.helpers import Plate
 from typing import Any
 from pandas import DataFrame
+from x_finder.utils.mixins.ica import IcaMixin
 
 
-class Provider:
+class Provider(IcaMixin):
     """
     The job of the provider is to turn an url into a plate containing a beautiful soup that will be given to the Parser
     """
@@ -26,12 +26,6 @@ class Provider:
         self.options: webdriver.ChromeOptions = self.get_driver_options()
         self.driver: webdriver.Chrome | None = None
         self.cookies: list[dict[str, Any]] | None = None
-
-    def sica(self, argument: str, category: str = "default") -> str:  # base_url, host_tag, search_id, search_tag
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
 
     @staticmethod
     def get_driver_options() -> webdriver.ChromeOptions:
@@ -120,10 +114,11 @@ class Provider:
 
     def get_content(self, plate: Plate, keep_alive: bool = False) -> None:
         url = plate.url
-        if url and self.driver is not None:
+        if url:
             self.get_page(url)
-            title = self.driver.title
-            plate.title = title
+            if self.driver is not None:
+                title = self.driver.title
+                plate.title = title
             if keep_alive and not self.cookies:
                 self.accept_cookies()
                 self.extract_cookies()
@@ -155,16 +150,15 @@ class Provider:
                 category_parts = title_parts[1].split('(')
                 plate.category = category_parts[0].lower().strip('):,;. ').replace(' ', '_')
 
-    @staticmethod
-    def cook_from_html(html: str | bytes, parser: str) -> BeautifulSoup:
-        raw_soup = BeautifulSoup(html, parser)
-        return raw_soup
-
-    def cook(self, plate: Plate, parser: str = 'auto', keep_alive: bool = False):
+    def cook_from_html(self, html: str | bytes, parser: str = "") -> BeautifulSoup:
         if parser in self.parsers:
             parser = parser
         elif self.parser is not None:
             parser = self.parser
+        raw_soup = BeautifulSoup(html, parser)
+        return raw_soup
+
+    def cook(self, plate: Plate, parser: str = 'auto', keep_alive: bool = False):
         if plate.url:
             self.get_content(plate, keep_alive=keep_alive)
             self.extract_plate_name_and_category(plate)

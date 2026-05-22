@@ -95,9 +95,12 @@ class U:
             key = nav_string.get_text().strip(':')
         else:
             key = text
+        separators = '(:—'
         separator = '('
-        if ':' in key:
-            separator = ':'
+        for char in separators:
+            if char in key:
+                separator = char
+                break
         key_parts = key.split(separator)
         key = key_parts[0].strip(' ,;').lower().replace(' ', '_').replace('-', '_').replace('–', '_')
         value = ""

@@ -41,7 +41,7 @@ class Con:
                 self.execute_sql(sql)
                 with lite.connect(self.db, **self.kwargs) as conn:
                     inserted = df.to_sql(name=name, con=conn, if_exists='append', index=False)
-                    print(inserted)
+                    rows_list = [1]*inserted
             if action is not None:
                 sql_builder = SQL(action, name, columns=columns, values=values, wheres=wheres)
                 sql = sql_builder.get()

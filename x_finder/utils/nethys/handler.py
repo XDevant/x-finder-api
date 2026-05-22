@@ -9,21 +9,15 @@ from x_finder.utils.datahandling import Dh
 class TargetDh(Dh):
     def __init__(self, target, edition):
         super().__init__(target, edition)
+        if not edition:
+            self.provider = TargetProvider(self.target, self.edition)
+            self.parser = TargetParser(self.target, self.edition)
+            self.normalizer = TargetNormalizer(self.target, self.edition)
+            self.modeler = TargetModeler(self.target, self.edition)
+            self.dispatch_ica()
 
-    def instantiate_provider(self):
-        self.provider = TargetProvider(self.target, self.edition)
-        self.provider.ica = self.ica
-
-    def instantiate_parser(self):
-        self.parser = TargetParser(self.target, self.edition)
-        self.parser.reader = TargetReader()
-        self.parser.ica = self.ica
-        self.parser.reader.ica = self.ica
-
-    def instantiate_normalizer(self):
-        self.normalizer = TargetNormalizer(self.target, self.edition)
-        self.normalizer.ica = self.ica
-
-    def instantiate_modeler(self):
-        self.modeler = TargetModeler(self.target, self.edition)
-        self.modeler.ica = self.ica
+    def instantiate_workers(self) -> None:
+        self.instantiate_provider(TargetProvider(self.target, self.edition))
+        self.instantiate_parser(TargetParser(self.target, self.edition))
+        self.instantiate_normalizer(TargetNormalizer(self.target, self.edition))
+        self.instantiate_modeler(TargetModeler(self.target, self.edition))

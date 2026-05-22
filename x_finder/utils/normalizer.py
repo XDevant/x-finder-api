@@ -1,25 +1,13 @@
 from utils import U
-from args import Ica
 from pandas import DataFrame
+from x_finder.utils.mixins.ica import IcaMixin
 
 
-class Normalizer:
+class Normalizer(IcaMixin):
     def __init__(self, target: str, edition: str) -> None:
         self.target: str = target
         self.edition: str = edition
         self.ica: dict[str, dict[str, str | list[str]]] = {}
-
-    def sica(self, argument: str, category: str = "default") -> str:  # subtype, name_nest
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
-
-    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # text_columns
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, list):
-            return arguments
-        return []
 
     @staticmethod
     def split_text_column(df: DataFrame, name: str, new_name: str, separator: str = ' ', strip: str = ' ') -> None:
@@ -50,28 +38,84 @@ class Normalizer:
         self.split_text_column(df, "name", name_nest, separator='[', strip=' ]')
         self.split_text_column(df, "name", subtype, separator='(', strip=' )')
         if "level" in df.columns:
-            if "spell_type" in self.lica("text_columns", category=key):
-                df["spell_type"] = df.apply(
-                    lambda r: r["level"].split(' ')[0].strip(),
-                    axis=1)
-            df["level"] = df.apply(
-                lambda r: U.numerize_level(r["level"]),
-                axis=1)
+            self.norm_level(df, category=key)
         if "description" not in df.columns and "other" in df.columns:
             df.rename(columns={"other": "description"}, inplace=True)
-        if "source" in df.columns and "source_page" not in df.columns:
-            df.rename(columns={"source": "sources"}, inplace=True)
-            df["source"] = df.apply(lambda r: [src for src in r["sources"] if source_name in src], axis=1)
-            df["source_page"] = df.apply(
-                lambda r: int(r["source"][0].split('pg. ')[-1]) if r['source'] and 'pg. ' in r["source"][0] else 0,
-                axis=1)
-            df["source"] = df.apply(lambda r: r["source"][0].split('pg. ')[0].strip() if r['source'] else "unknown",
-                                    axis=1)
+        self.norm_sources(df, source_name=source_name)
+        if key in ["bloodlines"]:
+            self.norm_focus_spells(df, key)
+            self.norm_bonus_spells(df, key)
         columns = {'url': 'nethys_url'}
         if "x_finder_related_model" in df.columns and "subtype" not in df.columns:
             columns['x_finder_related_model'] = "subtype"
         df.rename(columns=columns, inplace=True)
         return df
+
+    @staticmethod
+    def stringify_df(df: DataFrame) -> None:
+        for column in df.columns:
+            join = " "
+            if column.endswith("s"):
+                join = "; "
+            df[column] = df.apply(
+                lambda r: join.join([str(e) for e in set(r[column])]) if isinstance(r[column], list) else r[column],
+                axis=1)
+
+    @staticmethod
+    def norm_sources(df: DataFrame, source_name: str) -> None:
+        if "source" in df.columns and "source_page" not in df.columns:
+            df.rename(columns={"source": "sources"}, inplace=True)
+        if "sources" in df.columns:
+            df["source"] = df.apply(
+                lambda r: [src for src in r["sources"] if source_name in src] if isinstance(r["sources"], list) else [
+                    r["sources"]],
+                axis=1
+            )
+            df["source_page"] = df.apply(
+                lambda r: int(r["source"][0].split('pg. ')[-1]) if isinstance(r['source'], list) and isinstance(
+                    r["source"][0], str) else 0,
+                axis=1
+            )
+            df["source"] = df.apply(
+                lambda r: r["source"][0].split('pg. ')[0].strip() if isinstance(r['source'], list) and isinstance(
+                    r["source"][0], str) else "unknown",
+                axis=1
+            )
+
+    def norm_level(self, df: DataFrame, category: str) -> None:
+        if "spell_type" in self.lica("text_columns", category=category):
+            df["spell_type"] = df.apply(
+                lambda r: r["level"].split(' ')[0].strip(),
+                axis=1)
+        df["level"] = df.apply(
+            lambda r: U.numerize_level(r["level"]),
+            axis=1)
+
+    @staticmethod
+    def norm_focus_spells(df: DataFrame, category: str) -> None:
+        category_name = category
+        if category_name.endswith("s"):
+            category_name = category_name[:-1]
+        column = category_name + "_spells"
+        if column in df.columns:
+            ranks = ["initial", "advanced","greater"]
+            for i in range(len(ranks)):
+                df[ranks[i]] = df.apply(
+                    lambda r: r[column][0].split(',')[i].split(':')[-1] if len(r[column][0].split(',')) > i else "",
+                    axis=1
+                )
+
+    @staticmethod
+    def norm_bonus_spells(df: DataFrame, category: str) -> None:
+        category_dict = {"bloodlines": "sorcerous_gifts"}
+        column = category_dict[category]
+        if column in df.columns:
+            ranks = ["cantrip", "1st","2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"]
+            for i in range(len(ranks)):
+                df[ranks[i]] = df.apply(
+        lambda r: r[column][0].split(',')[i].split(':')[-1].strip() if len(r[column][0].split(',')) > i and r[column][0].split(',')[i].split(':')[0].strip() == ranks[i] else "",
+        axis=1
+                )
 
     @staticmethod
     def norm_sources_df(df: DataFrame) -> None:

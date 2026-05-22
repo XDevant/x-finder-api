@@ -28,6 +28,7 @@ class Plate:
         self.item_links: DataFrame | None = None
         self.data_dict: dict[str, list[dict[str, Any]]] | None = None
         self.dfs: dict[str, DataFrame] | None = None
+        self.extracted_tables: dict[str, DataFrame] = {}
         self.validated: bool = False
         self.completed: bool = False
         self.normalized: bool = False
@@ -46,7 +47,10 @@ class Plate:
             return "soup"
         if self.content is not None:
             return "content"
-        if self.item_links is not None:
+        links = self.item_links
+        if links is not None:
+            if not links[links["soup"] != "No soup"].empty:
+                return "soups"
             return "links"
         return "empty"
 
@@ -64,9 +68,10 @@ class Plate:
             case "content":
                 return self.content is not None
             case "links":
-                df = self.item_links
-                if df is not None and not df.empty:
-                    filtered_df = self.filter_df(df, category=category, source=source)
+                return self.item_links is not None and not self.item_links.empty
+            case "soups":
+                if self.item_links is not None:
+                    filtered_df = self.item_links[ self.item_links["soup"] != "No Soup"]
                     return not filtered_df.empty
                 return False
             case "completed":
@@ -89,30 +94,28 @@ class Plate:
         if category is None:
             for key,df in dfs.items():
                 key_df = self.filter_df(dfs[key], source=source)
-                if not key_df.empty:
+                if key_df is not None and not key_df.empty:
                     filtered_dfs[key] = key_df
             return filtered_dfs
         else:
             if category in dfs.keys():
                 category_df = self.filter_df(dfs[category], source=source)
-                if not category_df.empty:
+                if category_df is not None and not category_df.empty:
                     filtered_dfs[category] = category_df
         return filtered_dfs
 
-
     @staticmethod
-    def filter_df(df: DataFrame, category: str = None, source: str = None) -> DataFrame:
-        if category is None and source is None:
+    def filter_df(df: DataFrame | None, category: str = None, source: str = None) -> DataFrame | None:
+        if df is None or category is None and source is None:
+            return df
+        if "category" not in df.columns or "source" not in df.columns:
             return df
         if category is None:
-            if "source" in df.columns:
-                return df[ df["source"] == source ]
+            return df[ df["source"] == source ]
         if source is not None:
-            if category in df.columns:
-                category_df = df[ df["category"] == category ]
-                return category_df[ category_df["source"] == source ]
+            category_df = df[ df["category"] == category ]
+            return category_df[ category_df["source"] == source ]
         return df[ df["category"] == category ]
-
 
 
 class Status:
@@ -138,3 +141,4 @@ class Result:
         self.titles: list = []
         self.links: list = []
         self.tails: list = []
+        self.tables: dict[str, DataFrame] = {}

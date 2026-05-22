@@ -1,24 +1,12 @@
-from args import Ica
 from pandas import DataFrame
+from x_finder.utils.mixins.ica import IcaMixin
 
 
-class Modeler:
+class Modeler(IcaMixin):
     def __init__(self, target: str, edition: str) -> None:
         self.target: str = target
         self.edition: str = edition
         self.ica: dict[str, dict[str, str | list[str]]] = {}
-
-    def sica(self, argument: str, category: str = "default") -> str:  #
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
-
-    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # through_columns, model_cols, model excluded_cols
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, list):
-            return arguments
-        return []
 
     def fit_category_to_models(self, df: DataFrame, key: str) -> dict[str, DataFrame]:
         tables_dict = {key: self.extract_model_df(df, key)}

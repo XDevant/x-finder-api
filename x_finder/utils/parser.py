@@ -1,40 +1,19 @@
+from bs4.element import Tag
 from utils import U
-from args import Ica
 from helpers.helpers import Plate, Result, Status
 from reader import Reader
-from bs4.element import Tag
+from x_finder.utils.mixins.ica import IcaMixin
+from pandas import DataFrame
 
 
-class Parser:
+class Parser(IcaMixin):
     def __init__(self, target: str, edition: str) -> None:
         self.target: str = target
         self.edition: str = edition
         self.ica: dict[str, dict[str, str | list[str]]] = {}
-        self.reader: Reader = Reader()
-
-    def sica(self, argument: str, category: str = "default") -> str:  # main_id, title_id, title_tag, title_class
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
-
-    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # text_columns
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, list):
-            return arguments
-        return []
-
-    def bica(self, argument: str, category: str = "default", keys: bool = False) -> bool:  # nested
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, bool):
-            return arguments
-        return False
-
-    def intca(self, argument: str, category: str = "default", keys: bool = False) -> int:  # start_date
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, int):
-            return arguments
-        return 0
+        if not self.target:
+            self.reader: Reader = Reader()
+            self.reader.ica = self.ica
 
     def validate_plate(self, plate: Plate) -> None:
         main_id = self.sica("main_id")
@@ -166,7 +145,7 @@ class Parser:
                    result: Result,
                    debug: bool = False,
                    verbose: bool = False
-                   ) -> dict[str, list[dict[str, str]]]:
+                   ) -> tuple[dict[str, list[dict[str, str]]], dict[str, DataFrame]]:
         """Here we target the first tag after the title  and call the read_soup method to extract the expected
         key, values and fills the result instance.
 
@@ -217,7 +196,13 @@ class Parser:
                 print("Nested item categories")
                 print(nested_rows[key])
         nested_rows[plate.category] = parsed_rows
-        return nested_rows
+        tables = {}
+        for name, table in result.tables.items():
+            if name not in tables.keys():
+                tables[name] = [table]
+            else:
+                tables[name].append(table)
+        return nested_rows, tables
 
     @staticmethod
     def clean_name(name: str) -> str:

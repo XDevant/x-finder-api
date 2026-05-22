@@ -92,8 +92,12 @@
   },
   "arcane_schools": {
     "app": "core",
-    "text_columns": ["source"],
-    "model_columns": ["name", "nethys_url", "school_spell", "source", "source_page", "description"]
+    "text_columns": ["source", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial", "advanced", "curriculum", "school_spells", "no_curriculum"],
+    "model_columns": ["name", "nethys_url", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial_focus", "advanced_focus", "source", "source_page", "description"],
+    "start_tags": ["b", null],
+    "end_tags": ["b", "br"],
+    "desc_tags": [],
+    "title_tags": []
   },
   "arcane_thesis": {
     "app": "core",
@@ -112,8 +116,9 @@
     "model_columns": ["name", "nethys_url", "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma", "free", "skill", "lore", "skill_feat", "source", "source_page", "description"]
   },
   "bloodlines": {"app": "core",
-    "text_columns": ["source", "spell_list", "bloodline_skills", "granted_spells", "bloodline_spells", "blood_magic"],
-    "model_columns": ["name", "nethys_url", "spell_list", "bloodline_skills", "granted_cantrip", "granted_1", "granted_2", "granted_3", "granted_4", "granted_5", "granted_6", "granted_7", "granted_8", "granted_9", "initial_bloodline_spell", "advanced_bloodline_spell", "greater_bloodline_spell", "blood_magic", "source", "source_page", "description"]
+    "text_columns": ["source", "tradition", "bloodline_skills", "sorcerous_gifts", "bloodline_spells", "blood_magic"],
+    "model_columns": ["name", "nethys_url", "tradition", "skills", "cantrip", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial_focus", "advanced_focus", "greater_focus", "blood_magic", "source", "source_page", "description"],
+    "end_tags": ["div", "br"]
   },
   "causes": {"app": "core",
     "text_columns": ["source"],
@@ -198,8 +203,8 @@
   },
   "druidic_orders": {
     "app": "core",
-    "text_columns": ["source"],
-    "model_columns": ["name", "nethys_url", "order_skill", "order_feat", "order_spell", "source", "source_page", "description"]
+    "text_columns": ["source", "order_skill", "druid_feat", "order_spell", "anathema"],
+    "model_columns": ["name", "nethys_url", "skills", "feat", "focus_spell", "anathema", "source", "source_page", "description"]
   },
   "equipment": {
     "app": "core",
@@ -243,8 +248,8 @@
   },
   "instincts": {
     "app": "core",
-    "text_columns": ["source", "anathema", "instinct_ability", "anathema_and_instinct_ability", "specialization_ability", "raging_resistance"],
-    "model_columns": ["name", "nethys_url", "anathema", "instinct_ability", "anathema_and_instinct_ability", "specialization_ability", "raging_resistance", "source", "source_page", "description"]
+    "text_columns": ["source", "anathema", "instinct_ability", "specialization_ability", "raging_resistance"],
+    "model_columns": ["name", "nethys_url", "anathema", "instinct_ability", "specialization_ability", "raging_resistance", "source", "source_page", "description"]
   },
   "key_terms": {
     "app": "core",
@@ -288,7 +293,8 @@
     "app": "core",
     "text_columns": ["source", "melee", "ranged", "damage", "action"],
     "model_columns": ["name", "nethys_url", "melee", "ranged", "damage", "action", "traits", "source", "source_page", "x_finder_related_item", "x_finder_related_model", "description"],
-    "nested": true},
+    "nested": true
+  },
   "monster_spells": {
     "app": "core",
     "text_columns": ["source", "10th", "9th", "8th", "7th", "6th", "5th", "4th", "3rd", "2nd", "1st", "cantrip", "constant"],
@@ -297,8 +303,13 @@
   },
   "muses": {
     "app": "core",
-    "text_columns": ["source"],
+    "text_columns": ["source", "muse_feat", "muse_spell"],
     "model_columns": ["name", "nethys_url", "bonus_spell", "bonus_feat", "source", "source_page", "description"]
+  },
+  "mysteries": {"app": "core",
+    "text_columns": ["source", "granted_spells", "revelation_spells", "related_domains", "mystery_skill", "oracle_feat"],
+    "model_columns": ["name", "nethys_url", "bonus_feat", "skills", "granted_cantrip", "granted_1", "granted_2", "granted_3", "granted_4", "granted_5", "granted_6", "granted_7", "granted_8", "granted_9", "initial_focus_spell", "advanced_focus_spell", "greater_focus_spell", "domains", "source", "source_page", "description"],
+    "end_tags": ["div", "br"]
   },
   "poisons": {
     "app": "core",

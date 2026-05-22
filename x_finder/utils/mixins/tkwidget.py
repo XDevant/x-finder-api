@@ -1,10 +1,14 @@
-from tkinter import Label, Listbox, Entry, Button, Scrollbar, Frame
+from tkinter import Label, Listbox, Entry, Button, Scrollbar, Frame, END
 from typing import Callable, Literal
 from x_finder.utils.widgets import widgets as widget_list
 
 
 class TkWidgetMixin:
-
+    def say(self, message: str):
+        try:
+            self.__getattribute__("message_box").insert(END, message)
+        except AttributeError:
+            print("Message Box not found")
 
     def update_label(self, label: str, text: str) -> None:
         try:
@@ -25,8 +29,7 @@ class TkWidgetMixin:
                            parent,
                            widget_options: dict[str, str | int],
                            grid_options: dict[str, str | int | tuple[int,int]],
-                           scrollbar: bool = True,
-                           scrollbar_h: bool = False)-> None:
+                           other: dict[str, bool] |None = None)-> None:
         if name.startswith("message"):
             name = "message_box"
         else:
@@ -38,20 +41,22 @@ class TkWidgetMixin:
         box.bind('<<ListboxSelect>>', lambda e: self.on_select(name,
                                                                    e.widget.curselection()
                                                                    ))
-        if scrollbar:
+        if not (other and "scrollbar"in other.keys() and not other["scrollbar"]):
             self.__setattr__(f"scroll_v_{name}",
                              Scrollbar(parent, orient="vertical", command=box.yview))
             box['yscrollcommand'] = self.__getattribute__(f"scroll_v_{name}").set
             offset = 1
+            options = {**grid_options}
             if "columnspan" in grid_options.keys():
                 span = grid_options["columnspan"]
                 if isinstance(span, int):
                     offset = span
             if "column" in grid_options.keys():
-                grid_options["column"] = offset + grid_options["column"]
-            grid_options['padx'] = (0, 8)
-            self.__getattribute__(f"scroll_v_{name}").grid(**grid_options)
-        if scrollbar_h:
+                options["column"] = offset + grid_options["column"]
+            options['padx'] = (0, 8)
+            self.__getattribute__(f"scroll_v_{name}").grid(**options)
+
+        if other and "scrollbar_h"in other.keys() and other["scrollbar_h"]:
             self.__setattr__(f"scroll_h_{name}",
                              Scrollbar(parent, orient="horizontal", command=box.xview))
             box['xscrollcommand'] = self.__getattribute__(f"scroll_h_{name}").set
@@ -62,19 +67,21 @@ class TkWidgetMixin:
                     offset = span
             if "row" in grid_options.keys():
                 grid_options["row"] = offset + grid_options["row"]
-            self.__getattribute__(f"scroll_v_{name}").grid(**grid_options)
+            self.__getattribute__(f"scroll_h_{name}").grid(**grid_options)
 
     def initialize_frame(self, name: str,
                          parent,
                          widget_options: dict[str, str | int],
-                         grid_options: dict[str, str | int]) -> None:
+                         grid_options: dict[str, str | int],
+                         other: dict[str, bool] |None = None) -> None:
         self.__setattr__(name, Frame(parent, **widget_options))
         self.__getattribute__(name).grid(**grid_options)
 
     def initialize_label(self, name: str,
                          parent,
                          widget_options: dict[str, str | int],
-                         grid_options: dict[str, str | int]) -> None:
+                         grid_options: dict[str, str | int],
+                         other: dict[str, bool] |None = None) -> None:
         if name:
             if not "text" in widget_options.keys() or not widget_options["text"]:
                 text = " ".join(name.split("_")[1:-1]).capitalize()
@@ -82,7 +89,11 @@ class TkWidgetMixin:
             self.__setattr__(name, Label(parent, **widget_options))
             self.__getattribute__(name).grid(**grid_options)
 
-    def initialize_button(self, name: str, parent, widget_options: dict[str, str | int | Callable], grid_options: dict[str, str | int]) -> None:
+    def initialize_button(self,
+                          name: str,
+                          parent, widget_options: dict[str, str | int | Callable],
+                          grid_options: dict[str, str | int],
+                          other: dict[str, bool] | None = None) -> None:
         if name:
             if not "text" in widget_options.keys() or not widget_options["text"]:
                 text = " ".join(name.split("_")[:-1]).title()
@@ -98,6 +109,21 @@ class TkWidgetMixin:
                 widget_options = {**widget_options, "command": command}
             self.__setattr__(name, Button(parent, **widget_options))
             self.__getattribute__(name).grid(**grid_options)
+
+    def initialize_entry(self,
+                         name: str,
+                         parent,
+                         widget_options: dict[str, str | int | Callable],
+                         grid_options: dict[str, str | int],
+                         other: dict[str, bool] |None = None) -> None:
+        self.__setattr__(name, Entry(parent, **widget_options))
+        entry = self.__getattribute__(name)
+        entry.grid(**grid_options)
+        command_name = f"execute_{name}"
+        try:
+            entry.bind('<Return>', self.__getattribute__(command_name))
+        except AttributeError:
+            print(f"{command_name} command not found")
 
     def initialize_widgets(self) -> None:
         for key in widget_list.keys():
@@ -119,10 +145,14 @@ class TkWidgetMixin:
             widget_name = parent_name + "_" + widget_name
         if widget["name"] != 'root':
             parent_name += "_frame"
+        other = None
+        if "other" in widget.keys():
+            other = widget["other"]
         self.__getattribute__(f"initialize_{name}")(widget_name,
                                                     self.__getattribute__(parent_name),
                                                     {**widget_default, **widget["widget"]},
-                                                    {**grid_default, **widget["grid"]})
+                                                    {**grid_default, **widget["grid"]},
+                                                    other=other)
 
     def on_select(self, list_name: str, curselection: list[int]) -> None:
         pass

@@ -2,30 +2,12 @@ from typing import Literal
 from bs4.element import Tag
 from helpers.helpers import Status, Result
 from utils import U
-from args import Ica
+from mixins.ica import IcaMixin
 
 
-class Reader:
+class Reader(IcaMixin):
     def __init__(self):
         self.ica: dict[str, dict[str, str | list[str]]] = {}
-
-    def sica(self, argument: str, category: str = "default") -> str:  # end_tags, title_tags, start_tags
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
-
-    def lica(self, argument: str, category: str = "default", keys: bool = False) -> list[str]:  # tex_columns, chk_cols, nested_columns, description_tags
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, list):
-            return arguments
-        return []
-
-    def bica(self, argument: str, category: str = "default", keys: bool = False) -> bool:  # nested, no_description, overload
-        arguments = Ica.get(self.ica, argument, category=category, keys=keys)
-        if isinstance(arguments, bool):
-            return arguments
-        return False
 
     def read_soup(self,
                   child: Tag | None,
@@ -43,11 +25,11 @@ class Reader:
 
         value = U.clean_text(child.get_text())   # we deal with the results we have before taking care of the data
         if current_category == "default":  # We are in an unidentified empty title we store on main item title[0] first
-            store_time = child.name and child.name in self.sica("end_tags", category)
+            store_time = child.name and child.name in self.lica("end_tags", category)
         else:  # We will store current or first, deciding witch in the store method
-            store_time = child.name and child.name in self.sica("end_tags", current_category)
+            store_time = child.name and child.name in self.lica("end_tags", current_category)
         steal_time = result.titles[status.ended]["name"] in ["Activate", "Melee", "Ranged"] and not status.loaded_values
-
+        print(child.name, status.last_key, current_category, store_time, steal_time)
         if status.last_key and store_time:  # we have all the values for that key.
             if steal_time:                  # we steal the key if we have no value and are missing a title name.
                 result.titles[status.ended]["name"] = value
@@ -78,7 +60,7 @@ class Reader:
                     self.add_new_title(child, result, status, nested_category)
                 elif status.family:  # this url holds several items of the same family
                     self.add_new_title(child, result, status, category)
-                else:  # We open an empty title, setting current_category to default, useful to escape
+                else:  # We open an empty title, setting current_category to default, useful to escape a nested category
                     self.add_new_title(child, result, status)
             case "new_key":
                 nested_category = self.find_nested_item_category(key, href, child.next_sibling, category)
@@ -119,10 +101,10 @@ class Reader:
                 key, name, description = self.find_table_key_name_and_description(status, result, child, category)
 
                 if child.name == "table":
-                    table = U.load_nested_table(child)
+                    table = self.load_nested_table(child)
                 else:
-                    table = U.load_nested_table(child.find('table'))
-                result.titles[0][key] = {"name": name, "description": description, "table": table}
+                    table = self.load_nested_table(child.find('table'))
+                result.tables[key] = table
             case "describe":
                 values = []
                 if child.name in ['ol', 'ul']:
@@ -311,8 +293,8 @@ class Reader:
 
     def analyse_status_and_tag(self,
                                child: Tag,
-                               status,
-                               current_category,
+                               status: Status,
+                               current_category: str,
                                key: str
                                ) -> Literal["load", "new_title", "new_key", "store", "trait", "action",
                                             "describe", "table", "dive", "next", ""]:
@@ -334,12 +316,14 @@ class Reader:
                 return "table"  # that we will more securely crawl in sub method
             if child.name in ["div", "details"] or "rules%" in child.name:
                 return "dive"  # we will recursively parse its children
+        if child.name is None and key in self.lica("text_columns", current_category):
+            return "new_key"
         if child.name in self.lica("desc_tags", current_category) or child.name is None:
             return "describe"
         return ""
 
     @staticmethod
-    def find_table_key_name_and_description(status, result, child, category):
+    def find_table_key_name_and_description(status: Status, result: Result, child: Tag, category: str) -> tuple[str]:
         key, name, description = [""] * 3
         if result.titles[status.ended]["name"].startswith('Table '):
             key, name = U.format_key(text=result.titles[status.ended]["name"])
@@ -429,3 +413,22 @@ class Reader:
             result.titles[status.ended][key] = values
             return
         result.parsed.append({key: values})
+
+    @staticmethod
+    def load_nested_table(child: Tag):
+        headers = []
+        table = []
+        row_len = 0
+        head = child.find('th')
+        if head:
+            headers = [td.get_text() for td in head.find_all('td')]
+        for tr in child.find_all('tr'):
+            cells = tr.find_all('td')
+            if not headers:
+                headers = [cell.get_text() for cell in cells]
+            else:
+                row = {header: cell.get_text() for header, cell in zip(headers, cells)}
+                row_len = max(row_len, len(row))
+                table.append(row)
+        return table
+

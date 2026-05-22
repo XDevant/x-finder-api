@@ -1,21 +1,23 @@
 import pandas as pd
-from os import makedirs
+import sys
 import json
 import sqlite3 as lite
-from args import Ica
+from os import makedirs
+from importlib import invalidate_caches
+from importlib.util import spec_from_file_location, module_from_spec, LazyLoader
+
+
 from provider import Provider
 from parser import Parser
 from normalizer import Normalizer
 from modeler import Modeler
-from reader import Reader
 from x_finder.x_finder.settings import BASE_DIR
 from helpers.helpers import Plate, Status, Result
-from importlib import reload, invalidate_caches, import_module
+from mixins.ica import IcaMixin
 
 """Df is not supposed to do much but provide base methods and hooks for each handler that will inherit from Df """
 
-
-class Dh:
+class Dh(IcaMixin):
     """Here we parse the item's data, check for nested item's and turn navigable strings into rows of data.
      We build a panda dataframe for each category of items and normalize them for data tidying
      and make sure our dfs match our database models and extract tables through.
@@ -23,33 +25,20 @@ class Dh:
     def __init__(self, target="", edition=""):
         self.target: str = target
         self.edition: str = edition
-        self.ica: dict[str, dict[str, str | list[str]]] = {}
-        self.provider: Provider = Provider(self.target, self.edition)
-        self.parser: Parser = Parser(self.target, self.edition)
-        self.normalizer: Normalizer = Normalizer(self.target, self.edition)
-        self.modeler: Modeler = Modeler(self.target, self.edition)
         self.path: str = f"{BASE_DIR}\\utils\\"
         self.load_ica()
-        self.dispatch_ica()
+        if not target:
+            self.provider = Provider(self.target, self.edition)
+            self.parser = Parser(self.target, self.edition)
+            self.normalizer = Normalizer(self.target, self.edition)
+            self.modeler = Modeler(self.target, self.edition)
+            self.dispatch_ica()
 
-    def instantiate_provider(self) -> None:
-        self.provider = Provider(self.target, self.edition)
-        self.provider.ica = self.ica
-
-    def instantiate_parser(self) -> None:
-        parser = Parser(self.target, self.edition)
-        parser.reader = Reader()
-        parser.ica = self.ica
-        parser.reader.ica = self.ica
-        self.parser = parser
-
-    def instantiate_normalizer(self) -> None:
-        self.normalizer = Normalizer(self.target, self.edition)
-        self.normalizer.ica = self.ica
-
-    def instantiate_modeler(self) -> None:
-        self.modeler = Modeler(self.target, self.edition)
-        self.modeler.ica = self.ica
+    def instantiate_workers(self) -> None:
+        self.instantiate_provider(Provider(self.target, self.edition))
+        self.instantiate_parser(Parser(self.target, self.edition))
+        self.instantiate_normalizer(Normalizer(self.target, self.edition))
+        self.instantiate_modeler(Modeler(self.target, self.edition))
 
     def build_path(self, file: str, data: bool = False, edition: bool = True):
         path = self.path
@@ -64,6 +53,7 @@ class Dh:
 
     def load_ica(self) -> None:
         path = self.build_path("args.json")
+        print(path)
         with open(path) as file:
             self.ica = json.load(file)
 
@@ -73,12 +63,6 @@ class Dh:
         self.normalizer.ica = self.ica
         self.modeler.ica = self.ica
         self.parser.reader.ica = self.ica
-
-    def sica(self, argument: str, category: str = "default") -> str:  # index_url, nav_id, title_tag
-        arguments = Ica.get(self.ica, argument, category=category)
-        if isinstance(arguments, str):
-            return arguments
-        return ""
 
     @staticmethod
     def save(df, name: str, directory: str | None = None, app: str = "utils") -> None:
@@ -98,7 +82,7 @@ class Dh:
         df = pd.read_csv(pathfile, delimiter="|")
         return df
 
-    def save_df(self, df: pd.DataFrame, name: str, target: bool = False) -> None:
+    def save_df_to_db(self, df: pd.DataFrame, name: str, target: bool = False) -> None:
         if target:
             file = f"{self.target}_index.db"
             db = self.build_path(file, data=True, edition=False)
@@ -131,22 +115,35 @@ class Dh:
     def build_dfs(self,
                   dict_of_lists_of_dicts: dict[str, list[dict[str, str]]],
                   source_name: str = "Unknown",
-                  suffix: str = ""
+                  suffix: str = "",
+                  from_csv: bool = False
                   ) -> dict[str, pd.DataFrame]:
         completed_category_dfs = {}
         for key in dict_of_lists_of_dicts.keys():
             list_of_dicts = dict_of_lists_of_dicts[key]
-            df = self.build_df(list_of_dicts, source_name=source_name, category=key, suffix=suffix)
+            df = pd.DataFrame.from_records(data=list_of_dicts)
+            if from_csv:
+                self.save_df(df, source_name=source_name, category=key, suffix=suffix)
             completed_category_dfs[key] = df
         return completed_category_dfs
 
-    def build_df(self,
-                 list_of_dicts: list[dict[str, str]],
+    @staticmethod
+    def build_df_from_table(table: list[list[str]]) -> pd.DataFrame:
+        headers = []
+        data = []
+        if len(table) > 0:
+            headers = table[0]
+        if len(table) > 1:
+            data = table[1:]
+        df = pd.DataFrame(data=data, columns=headers)
+        return df
+
+    def save_df(self,
+                 df: pd.DataFrame,
                  source_name: str = "Unknown",
                  category: str = "unknown",
                  suffix: str = ""
                  ) -> pd.DataFrame:
-        df = pd.DataFrame.from_records(data=list_of_dicts)
         if not suffix:
             suffix = "completed"
         suffix = f"{category}{'__' if suffix else ''}{suffix}"
@@ -162,30 +159,6 @@ class Dh:
             directory += "\\" + source_name
         self.save(df, suffix, directory=directory, app="utils")
         return df
-    """
-    def finalize_completed_dfs(self, dict_of_dfs: dict[str, pd.DataFrame], source_name: str) -> None:
-        normed_category_dfs = {}
-        finalized_category_dfs = {}
-        missed_category_dfs = {}
-        for key in dict_of_dfs.keys():
-            app = self.get("app", key)
-            df = dict_of_dfs[key]
-            try:
-                normed_df = self.normalizer.norm_df(df, key, source_name)
-                normed_category_dfs[key] = normed_df
-                suffix = "normed"
-            except Exception:
-                print(f"An error occurred while norming {key} df")
-                missed_category_dfs[key] = df
-                suffix = "missed"
-            if suffix == "normed":
-                try:
-                    model_df = self.modeler.extract_model_dfs(df, key)
-                    finalized_category_dfs[key] = model_df
-                    self.save(model_df, f"{key}__finalized", directory=source_name, app=app)
-                except Exception:
-                    print(f"An error occurred while finalizing {key} df")
-    """
 
     def extract_source_links(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
         if plate.soup is None:
@@ -212,7 +185,7 @@ class Dh:
             print("result title", *result.titles, status.start is not None)
 
         if status.start:
-            parsed_rows = self.parser.parse_item(plate, status=status, result=result, debug=debug, verbose=verbose)
+            parsed_rows, tables = self.parser.parse_item(plate, status=status, result=result, debug=debug, verbose=verbose)
             if not parsed_rows:
                 if debug:
                     print(f"Parsing failed for {title}\n")
@@ -221,6 +194,10 @@ class Dh:
                 plate.data_dict = items
                 if items:
                     plate.completed = True
+            if tables:
+                for name, table in tables.items():
+                    df = pd.DataFrame.from_records(table)
+                    plate.extracted_tables[name] = df
         else:
             print(f"title = {title}, start is {'none' if status.start is None else 'not none'}")
 
@@ -228,6 +205,14 @@ class Dh:
         plate = Plate(url=url)
         self.provider.cook(plate, parser=parser, keep_alive=keep_alive)
         self.parser.validate_plate(plate)
+        return plate
+
+    def recook_soup(self, url:str, content:str, parser:str = "") -> Plate:
+        plate = Plate(url=url)
+        if content is not None:
+            plate.content = content
+            soup = self.provider.cook_from_html(content, parser=parser)
+            plate.soup = soup
         return plate
 
     def extract_sources(self) -> Plate | None:
@@ -279,10 +264,14 @@ class Dh:
         return title, self.provider.cookies is not None
 
     def normalize_df(self, plate: Plate, category: str, source_name: str) -> None:
-        if plate.dfs is None:
+        if plate.dfs is None or category not in plate.dfs.keys():
             return
         df = plate.dfs[category]
-        self.normalizer.norm_df(df, category, source_name=source_name)
+        try:
+            self.normalizer.norm_df(df, category, source_name=source_name.replace('_', ' ').title())
+        except AttributeError:
+            pass
+        self.normalizer.stringify_df(df)
         try:
             self.normalizer.__getattribute__(f"norm_{category}_df")(df, category)
         except AttributeError:
@@ -297,11 +286,36 @@ class Dh:
             for model in model_dfs.keys():
                 self.save(model_dfs[model], name=f"{model}__finalized", directory=directory, app="utils")
 
-    def update_worker(self, worker: str) -> None:
-        module = import_module(worker)
-        reload(module.__getattribute__(f"Edition{worker.title()}"))
-        invalidate_caches()
-        self.__getattribute__(f"instantiate_{worker}")()
+    def update_worker(self, worker_name: str) -> None:
+        spec = spec_from_file_location(worker_name.title(), f"{worker_name.lower()}.py")
+        if spec is not None and spec.loader is not None:
+            loader = LazyLoader(spec.loader)
+            spec.loader = loader
+            module = module_from_spec(spec)
+            sys.modules[worker_name.title()] = module
+            if spec.loader is not None:
+                spec.loader.exec_module(module)
+                invalidate_caches()
+                worker = module.__getattribute__(worker_name.title())(self.target, self.edition)
+                self.__getattribute__(f"instantiate_{worker_name.lower()}")(worker)
+                print(f"{worker_name.title()} was successfully updated")
+
+    def instantiate_provider(self, provider: Provider) -> None:
+        self.provider = provider
+        self.provider.ica = self.ica
+
+    def instantiate_parser(self, parser: Parser) -> None:
+        parser.ica = self.ica
+        parser.reader.ica = self.ica
+        self.parser = parser
+
+    def instantiate_normalizer(self, normalizer: Normalizer) -> None:
+        self.normalizer = normalizer
+        self.normalizer.ica = self.ica
+
+    def instantiate_modeler(self, modeler: Modeler) -> None:
+        self.modeler = modeler
+        self.modeler.ica = self.ica
 
 
 if __name__ == "__main__":

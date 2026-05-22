@@ -9,13 +9,6 @@ class TargetNormalizer(Normalizer):
 
     @staticmethod
     def norm_sources_df(df: DataFrame) -> None:
-        for column in df.columns:
-            join = " "
-            if column.endswith("s"):
-                join = "; "
-            df[column] = df.apply(
-                lambda r: join.join([str(e) for e in r[column]]) if isinstance(r[column], list) else r[column],
-                axis=1)
         df["release_date"] = df.apply(lambda r: U.translate_date(str(r["release_date"])), axis=1)
         df["errata_date"] = df.apply(
             lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else "-",

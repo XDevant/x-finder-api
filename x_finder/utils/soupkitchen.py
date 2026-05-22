@@ -1,8 +1,6 @@
 from time import time, sleep
 from multiprocessing import Pool
-
 import pandas as pd
-
 from selector import Selector
 from helpers.helpers import Plate
 from datahandling import Dh
@@ -32,6 +30,9 @@ class SoupKitchen:
     def __str__(self) -> str:
         return f"Targeting {str(self.target)} {str(self.edition)}"
 
+    def test(self):
+        print('tested')
+
     def cook_url(self, link: dict[str, str], parser: str = "", keep_alive: bool = True) -> Plate:
         """Sends an url to the provider to get a plate with a soup"""
         plate = self.H.cook_url(link["url"], parser=parser, keep_alive=keep_alive)
@@ -44,9 +45,9 @@ class SoupKitchen:
             return
         else:
             df = source_plate.item_links
-            soup_dict = {name: self.H.cook_url(url).soup for name, url in zip(df["name"].to_list(), df["url"].to_list())}
-            for key, value in soup_dict.keys():
-                df["soup"]["name" == key] = value
+            zipped = zip(df["name"].to_list(), df["url"].to_list())
+            soup_dict = {name: self.H.cook_url(url, keep_alive=True).soup for name, url in zipped}
+            df["soup"] = df.apply(lambda row: str(soup_dict[row["name"]]), axis=1)
             source_plate.item_links = df
 
     def parse_item(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
@@ -88,10 +89,14 @@ class SoupKitchen:
         if plate.dfs is None:
             return
         for category in plate.dfs.keys():
-                self.normalize_df(plate, category, source)
+            print(category)
+            self.normalize_df(plate, category, source, validate=False)
+        plate.normalized = True
 
-    def normalize_df(self, plate: Plate, category: str, source: str) -> None:
+    def normalize_df(self, plate: Plate, category: str, source: str, validate: bool = True) -> None:
         self.H.normalize_df(plate, category, source)
+        if validate:
+            plate.normalized = True
 
     def fit_category_to_model(self, plate: Plate, category: str, source: str) -> None:
         self.H.fit_category_to_models(plate, category, source)
@@ -118,46 +123,6 @@ class SoupKitchen:
         print("No soup found, did you cook it?")
         return ""
 
-    def parse_all_category(self, source_plate: Plate, debug: bool = False, verbose: bool = False) -> None:
-        """
-        """
-        if source_plate.item_links is None:
-            return
-        data_dict = {}
-        for key in source_plate.item_links.keys():
-            results, missed = self.complete_category_items(source_plate, key, debug=debug, verbose=verbose)
-            for category in results.keys():
-                if category not in data_dict.keys():
-                    data_dict[category] = results[category]
-                else:
-                    data_dict[category] += results[category]
-        source_plate.data_dict = data_dict
-        source_plate.dfs = {key: pd.DataFrame.from_records(value) for key, value in data_dict.items()}
-
-    def parse_category(self,
-                       source_plate: Plate,
-                       category: str,
-                       limit: int = 20,
-                       debug: bool = False,
-                       verbose: bool = False) -> None:
-
-        results, missed = self.complete_category_items(source_plate,
-                                                       category,
-                                                       limit=limit,
-                                                       debug=debug,
-                                                       verbose=verbose)
-        if source_plate.data_dict is None:
-            data_dict = {}
-        else:
-            data_dict = source_plate.data_dict
-        for key in results.keys():
-            if key not in data_dict.keys():
-                data_dict[key] = []
-            data_dict[key] += results[key]
-        source_plate.data_dict = data_dict
-        completed_dfs = self.H.build_dfs(data_dict, source_name=source_plate.name)
-        source_plate.dfs = completed_dfs
-
     @chrono
     def complete_category_items(self,
                                 source_plate: Plate,
@@ -168,14 +133,19 @@ class SoupKitchen:
                                 ) -> tuple[dict[str, list[dict[str, str]]], dict[str, list[dict[str, str]]]]:
         results = {}
         missed = {}
+        tables = {}
         count = 0
         if source_plate.item_links is None:
             return results, missed
-        category_df = source_plate.item_links["category" == category]
-        vectoriel_zip = zip(category_df["name"].to_list(), category_df["url"].to_list())
-        for name, url in vectoriel_zip:
+        df = source_plate.item_links
+        category_df = df[df["category"] == category]
+        vectoriel_zip = zip(category_df["name"].to_list(), category_df["url"].to_list(), category_df["soup"].to_list())
+        for name, url, soup in vectoriel_zip:
             link = {"name": name, "url": url, "source": source_plate.name, "category": category}
-            item_plate = self.cook_url(link=link)
+            if "- From Db" in source_plate.title:
+                item_plate = self.H.recook_soup(url, soup)
+            else:
+                item_plate = self.cook_url(link=link)
             item_plate.category = category
             self.parse_item(item_plate, debug=debug, verbose=verbose)
             if item_plate.data_dict is None or category not in item_plate.data_dict.keys():
@@ -202,6 +172,50 @@ class SoupKitchen:
         else:
             print(f"No member of {category} found, check it's ICA's cell_start and next_tittles")
         return results, missed
+
+    def parse_all_category(self, source_plate: Plate, debug: bool = False, verbose: bool = False) -> None:
+        """
+        """
+        if source_plate.item_links is None:
+            return
+        data_dict = {}
+        for key in source_plate.item_links.keys():
+            results, missed = self.complete_category_items(source_plate, key, debug=debug, verbose=verbose)
+            for category in results.keys():
+                if category not in data_dict.keys():
+                    data_dict[category] = results[category]
+                else:
+                    data_dict[category] += results[category]
+        source_plate.data_dict = data_dict
+        source_plate.dfs = {key: pd.DataFrame.from_records(value) for key, value in data_dict.items()}
+        if source_plate.dfs:
+            source_plate.completed = True
+
+    def parse_category(self,
+                       source_plate: Plate,
+                       category: str,
+                       limit: int = 20,
+                       debug: bool = False,
+                       verbose: bool = False) -> None:
+
+        results, missed = self.complete_category_items(source_plate,
+                                                       category,
+                                                       limit=limit,
+                                                       debug=debug,
+                                                       verbose=verbose)
+        if source_plate.data_dict is None:
+            data_dict = {}
+        else:
+            data_dict = source_plate.data_dict
+        for key in results.keys():
+            if key not in data_dict.keys():
+                data_dict[key] = []
+            data_dict[key] += results[key]
+        source_plate.data_dict = data_dict
+        completed_dfs = self.H.build_dfs(data_dict, source_name=source_plate.name)
+        source_plate.dfs = completed_dfs
+        if source_plate.dfs:
+            source_plate.completed = True
 
     def extract_sources(self) -> Plate | None:
         """  """
