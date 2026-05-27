@@ -145,7 +145,7 @@ class Provider(IcaMixin):
         if plate.title:
             title_parts = plate.title.split('-')
             if plate.name == "unknown" and len(title_parts) > 0:
-                plate.name = title_parts[0].lower().strip('().,;: ').replace(' ', '_')
+                plate.name = title_parts[0].strip()
             if plate.category == "default" and len(title_parts) > 1:
                 category_parts = title_parts[1].split('(')
                 plate.category = category_parts[0].lower().strip('):,;. ').replace(' ', '_')

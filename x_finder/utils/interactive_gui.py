@@ -51,7 +51,7 @@ class InteractiveGui(GUI):
     def select_source(self, name: str, url: str) -> None:
         clean_name = name.lower().replace(' ', '_')
         if self.check_source(clean_name, url):
-            self.current_source = clean_name
+            self.current_source = name
             self.current_url = url
             self.current_item = self.current_source
             self.__getattribute__("source_list").selection_clear(0, 'end')

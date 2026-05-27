@@ -61,8 +61,12 @@ class PlateMixin(SqlitePandaMixin, CsvPandasMixin):
     def plate_to_db(self, plate: Plate, category: str | None = None) -> None:
         if category in ["links", "sources"] and plate.item_links is not None:
             self.df_to_db(plate.item_links, category)
-        dfs = plate.dfs
-        status = plate.status()
+        status: str = plate.status()
+        dfs: dict[str,DataFrame] | None = None
+        if status == "normalized":
+            dfs = plate.dfs
+        elif status == "modeled":
+            dfs = plate.model_dfs
         if dfs is None:
             return
         if category is None:

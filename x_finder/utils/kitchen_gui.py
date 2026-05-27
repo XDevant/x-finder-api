@@ -152,6 +152,7 @@ class KitchenGraphic(InteractiveGui):
                                     debug=self.debug,
                                     verbose=self.verbose)
         self.kitchen.normalize_dfs(self.current_plate, self.current_source)
+        self.kitchen.fit_source_to_models(self.current_plate, self.current_source)
         if self.current_plate.dfs is not None:
             for key in self.current_plate.dfs.keys():
                 self.plate_to_db(self.current_plate, category=key)
@@ -164,6 +165,7 @@ class KitchenGraphic(InteractiveGui):
         if self.current_plate and self.current_plate.item_links is not None:
             self.kitchen.parse_all_category(self.current_plate, debug=self.debug, verbose=self.verbose)
             self.kitchen.normalize_dfs(self.current_plate, self.current_source)
+            self.kitchen.fit_source_to_models(self.current_plate, self.current_source)
             if self.current_plate.dfs is not None:
                 for key in self.current_plate.dfs.keys():
                     self.plate_to_db(self.current_plate, category=key)

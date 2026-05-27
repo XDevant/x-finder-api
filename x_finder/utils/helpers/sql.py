@@ -70,16 +70,23 @@ class SQL:
 
     def add_column_type(self) -> list[str]:
         table_name = self.table.strip()
-        typed_cols = []
+        typed_cols: list[str] = []
+        uk: str = ""
         if self.columns is None:
             return []
         for column in self.columns:
-            if column == "name" and table_name != "links":
-                typed_cols.append(f"'{column}' TEXT UNIQUE ON CONFLICT REPLACE")
-            else:
+            if column != "name" or table_name == "links" or "quality" in self.columns or "x_finder_related_item" in self.columns:
                 typed_cols.append(f"'{column}' TEXT")
+            else:
+                typed_cols.append(f"'{column}' TEXT UNIQUE ON CONFLICT REPLACE")
         if table_name == "links":
             uk = "UNIQUE (name, category) ON CONFLICT REPLACE"
+        if "name" in self.columns:
+            if "quality" in self.columns:
+                uk = "UNIQUE (name, quality, level) ON CONFLICT REPLACE"
+            if "x_finder_related_item" in self.columns:
+                uk = "UNIQUE (name, x_finder_related_item) ON CONFLICT REPLACE"
+        if uk:
             typed_cols.append(uk)
         if "source" in self.columns and table_name != "sources":
             fk = "FOREIGN KEY (source) REFERENCES sources(name) ON DELETE CASCADE"

@@ -28,6 +28,7 @@ class Plate:
         self.item_links: DataFrame | None = None
         self.data_dict: dict[str, list[dict[str, Any]]] | None = None
         self.dfs: dict[str, DataFrame] | None = None
+        self.model_dfs: dict[str, DataFrame] | None = None
         self.extracted_tables: dict[str, DataFrame] = {}
         self.validated: bool = False
         self.completed: bool = False

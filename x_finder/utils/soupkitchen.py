@@ -92,20 +92,22 @@ class SoupKitchen:
             print(category)
             self.normalize_df(plate, category, source, validate=False)
         plate.normalized = True
+        if plate.model_dfs is not None:
+            plate.modeled = True
 
     def normalize_df(self, plate: Plate, category: str, source: str, validate: bool = True) -> None:
         self.H.normalize_df(plate, category, source)
         if validate:
             plate.normalized = True
 
-    def fit_category_to_model(self, plate: Plate, category: str, source: str) -> None:
+    def fit_category_to_models(self, plate: Plate, category: str, source: str) -> None:
         self.H.fit_category_to_models(plate, category, source)
 
-    def fit_source_to_model(self, plate: Plate, source: str) -> None:
+    def fit_source_to_models(self, plate: Plate, source: str) -> None:
         if plate.dfs is None:
             return
         for category in plate.dfs.keys():
-            self.fit_category_to_model(plate, category, source)
+            self.fit_category_to_models(plate, category, source)
 
     def update_worker(self, worker):
         self.H.update_worker(worker)
@@ -143,7 +145,7 @@ class SoupKitchen:
         for name, url, soup in vectoriel_zip:
             link = {"name": name, "url": url, "source": source_plate.name, "category": category}
             if "- From Db" in source_plate.title:
-                item_plate = self.H.recook_soup(url, soup)
+                item_plate = self.H.recook_soup(name=name, url=url, content=soup)
             else:
                 item_plate = self.cook_url(link=link)
             item_plate.category = category

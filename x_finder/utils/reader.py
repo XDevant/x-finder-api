@@ -53,7 +53,7 @@ class Reader(IcaMixin):
                 nested_category = self.find_nested_item_category(key, href, category=category)
                 check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
                 check_key = check_text_col and not nested_category == "actions"
-
+                print("family:", status.family, "nested_category:", nested_category)
                 if check_key:
                     self.load_key_value(status, key, tail)
                 elif check_nest:  # a nested category is identified
@@ -64,20 +64,21 @@ class Reader(IcaMixin):
                     self.add_new_title(child, result, status)
             case "new_key":
                 nested_category = self.find_nested_item_category(key, href, child.next_sibling, category)
-                check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
+                check_nest = nested_category is not None and nested_category not in ["default", "rules", category, ""]
                 if self.bica("nested", current_category) and check_text_col and check_nest:
                     if key in result.titles[status.ended].keys() and nested_category == current_category:
                         print("key stolen")
                         check_text_col = False
 
                 index = self.get_check_column_index(status, key, category, current_category)
+                print(f"nested category: {nested_category}, index:{index}")
                 if index >= 0:  # we have a key that matches a column that stores a bool
                     result.titles[index][key] = True
                     if tail:
                         self.describe(value, result, index=index)
-                elif not check_text_col:  # check overload for key_terms?
+                elif check_nest and not check_text_col:  # check overload for key_terms?
                     self.add_new_title(child, result, status, category=nested_category)
-                    if nested_category is not None and key in self.lica("text_columns", nested_category):
+                    if key in self.lica("text_columns", nested_category):
                         self.load_key_value(status, key, tail)
                 else:  # normal behavior
                     self.load_key_value(status, key, tail)
@@ -268,11 +269,11 @@ class Reader(IcaMixin):
                 next_model = self.sica("", next_text)
                 if next_model not in ["rules", "default", None]:
                     return next_model
-        if url_model is not None and url_model not in ["rules", "default", None]:
+        if url_model is not None and url_model not in ["rules", "default", None, ""]:
             return url_model
-        if name_model != "default" and name_model is not None:
+        if name_model is not None  and name_model and name_model != "default":
             return name_model
-        return ""
+        return "default"
 
     @staticmethod
     def check_for_traits(child: Tag):
@@ -377,12 +378,15 @@ class Reader(IcaMixin):
     def store(self, status: Status, result: Result, category: str, current_category: str) -> None:
         key = status.last_key
         values = [value for value in status.loaded_values if value.replace('\\n', '').strip()]
+        print(f"storing {key}: {values}")
         match = False
         text_cols = self.lica("text_columns", category)
         if key in text_cols or key.split('_')[0] in text_cols:
             match = True
+            print("match")
             if key not in result.titles[0].keys() and (not status.family or category != current_category):
                 result.titles[0][key] = values
+                print("stored in 0")
                 return
         current_text_cols = self.lica("text_columns", current_category)
         if key in current_text_cols:
@@ -412,6 +416,7 @@ class Reader(IcaMixin):
         if self.bica("overload", current_category):
             result.titles[status.ended][key] = values
             return
+        print(f"parsed {key} : {values}")
         result.parsed.append({key: values})
 
     @staticmethod

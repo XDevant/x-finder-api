@@ -43,8 +43,8 @@ class Parser(IcaMixin):
                      status: Status,
                      titles: list[Tag],
                      debug: bool = False,
-                     verbose: bool = False) -> None | dict[str, str]:
-        title_dict = {"plate_name": plate.name,
+                     verbose: bool = False) -> None | dict[str, str | list[str]]:
+        title_dict: dict[str, str | list[str]] = {"plate_name": plate.name,
                       "x_finder_model": plate.category}
         expected_length = 1
         end = "level" in self.lica("text_columns", plate.category)
@@ -89,14 +89,19 @@ class Parser(IcaMixin):
 
             if not end_found and not title_links:
                 next_text = next_tag.get_text()
-                if next_text:
-                    title_dict["description"] += [next_text]
+                if next_text and isinstance(next_text, str):
+                    if "description" not in title_dict.keys():
+                        title_dict["description"] = [next_text]
+                    else:
+                        title_dict["description"] += [next_text]
                 if debug:
                     print("Possible fake title spotted")
                 continue
             if verbose:
                 print(f"Start found for {'family' if status.family else 'item'}: {title_dict['name']}")
                 print(f"on h1: {title}")
+            if debug:
+                print(f"end_found: {end_found}", f"links : {title_links}")
             return title_dict
 
         if debug:

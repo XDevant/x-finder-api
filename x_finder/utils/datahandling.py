@@ -207,8 +207,8 @@ class Dh(IcaMixin):
         self.parser.validate_plate(plate)
         return plate
 
-    def recook_soup(self, url:str, content:str, parser:str = "") -> Plate:
-        plate = Plate(url=url)
+    def recook_soup(self, name: str, url:str, content:str, parser:str = "") -> Plate:
+        plate = Plate(name=name, url=url)
         if content is not None:
             plate.content = content
             soup = self.provider.cook_from_html(content, parser=parser)
@@ -271,17 +271,27 @@ class Dh(IcaMixin):
             self.normalizer.norm_df(df, category, source_name=source_name.replace('_', ' ').title())
         except AttributeError:
             pass
-        self.normalizer.stringify_df(df)
         try:
             self.normalizer.__getattribute__(f"norm_{category}_df")(df, category)
         except AttributeError:
             pass
+        self.normalizer.stringify_df(df)
+        try:
+            self.normalizer.__getattribute__(f"post_norm_{category}_df")(df, category)
+        except AttributeError:
+            pass
+        self.fit_category_to_models(plate, category, source_name)
 
-    def fit_category_to_models(self, plate: Plate, category: str, source: str) -> None:
+    def fit_category_to_models(self, plate: Plate, category: str, source: str, from_csv: bool = False) -> None:
         if plate.dfs is None:
             return
-        model_dfs = self.modeler.fit_category_to_models(plate.dfs[category], category)
+        model_dfs: dict[str, pd.DataFrame]  = self.modeler.fit_category_to_models(plate.dfs[category], category)
         if model_dfs:
+            if plate.model_dfs is None:
+                plate.model_dfs = model_dfs
+            else:
+                plate.model_dfs = {**plate.model_dfs, **model_dfs}
+        if from_csv:
             directory = self.target + '\\' + self.edition + '\\' + source
             for model in model_dfs.keys():
                 self.save(model_dfs[model], name=f"{model}__finalized", directory=directory, app="utils")
