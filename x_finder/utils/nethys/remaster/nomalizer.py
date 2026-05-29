@@ -135,6 +135,12 @@ class EditionNormalizer(TargetNormalizer):
             df["free"] = df.apply(
                 lambda r: [cell.split(" ")[1].lower() for cell in r["description"] if "free attribute boost" in cell],
                 axis=1)
+            df["free"] = df.apply(
+                lambda r: r["free"][0] if isinstance(r["free"], list) else "zero",
+                axis=1
+                                 ).map({"zero": 0, "one": 1, "two": 2, "three": 3})
+            for attribute in ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]:
+                df[attribute] = df.apply(lambda r: r[attribute] if isinstance(r[attribute],bool) else False , axis=1)
 
     @staticmethod
     def norm_classes_df(df: DataFrame, category: str) -> None:

@@ -17,21 +17,22 @@ class Proficiency(models.TextChoices):
     Master = 6
     Legendary = 8
 
+class Group(models.TextChoices):
+    CORE = 'Rulebooks'
+    COMICS = 'Comics'
+    ADV = 'Adventures'
+    PATH = 'Adventure Paths'
+    SOCIETY = 'Society'
+    BLOG = 'Blog Posts'
+    LOST_OMENS = 'Lost Omens'
+    CASUS = 'Casus Belli'
+    CUSTOM = 'Custom Source'
+
 
 class Source(models.Model):
-    class Group(models.TextChoices):
-        CORE = 'Rulebooks'
-        COMICS = 'Comics'
-        ADV = 'Adventures'
-        PATH = 'Adventure Paths'
-        SOCIETY = 'Society'
-        BLOG = 'Blog Posts'
-        LOST_OMENS = 'Lost Omens'
-        CASUS = 'Casus Belli'
-        CUSTOM = 'Custom Source'
     name = models.CharField(max_length=80)
-    group = models.CharField(max_length=50)
-    category = models.CharField(max_length=25, choices=Group.choices)
+    group = models.CharField(max_length=50, default='Custom Source')
+    category = models.CharField(max_length=25)
     release_date = models.DateField(blank=True, null=True)
     errata_date = models.DateField(blank=True, null=True)
     errata_version = models.CharField(max_length=10)
@@ -63,7 +64,7 @@ class Skills(models.Model):
         related_name='skill_source'
     )
     source_page = models.PositiveSmallIntegerField()
-    attribute = models.CharField(max_length=3, choices=Attribute.choices)
+    attribute = models.CharField(max_length=12, choices=Attribute.choices)
     description = models.TextField()
     description_links = models.TextField()
 
@@ -109,6 +110,17 @@ class CharClass(models.Model):
     free_skills = models.PositiveSmallIntegerField()
     skill_trainings = models.ManyToManyField(Skills, through='ClassSkills')
     features = models.ManyToManyField(Feature, through='ClassFeature')
+
+class ClassSkills(models.Model):
+    char_class = models.ForeignKey(
+        to=CharClass,
+        on_delete=models.CASCADE,
+        related_name='skill_class'
+    )
+    skill = models.ForeignKey(
+        to=Skills,
+        on_delete=models.CASCADE,
+        related_name='class_skill')
 
 
 class ClassFeature(models.Model):

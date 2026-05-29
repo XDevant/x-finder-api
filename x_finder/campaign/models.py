@@ -1,5 +1,5 @@
 from django.db import models
-from ..core.models import Source
+from core.models import Source
 
 
 class Deity(models.Model):
@@ -41,7 +41,7 @@ class Faction(models.Model):
         SECRET = 'Secret Organisation'
     name = models.CharField(max_length=25)
     home = models.CharField(max_length=25)
-    type = models.CharField(max_length=10, choices=Type.choices)
+    type = models.CharField(max_length=30, choices=Type.choices)
     purpose = models.TextField(max_length=60)
     activities = models.TextField(max_length=200)
 
@@ -52,7 +52,7 @@ class Npc(models.Model):
     rounds = models.IntegerField
     threshold = models.IntegerField
     home = models.CharField(max_length=25)
-    faction = source = models.ForeignKey(
+    faction = models.ForeignKey(
         to=Faction,
         on_delete=models.PROTECT,
         related_name='npc_faction'

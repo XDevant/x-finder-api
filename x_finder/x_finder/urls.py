@@ -14,10 +14,27 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.template import context
 from django.urls import path, include
+from django.views.generic.base import TemplateView
+from rest_framework.routers import DefaultRouter
 
+
+class HomePageView(TemplateView):
+    template_name = "x_index.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["apps"] = ["remaster", "starfinder"]
+        context["auths"] = ["login", "logout"]
+        return context
+
+router = DefaultRouter()
 
 urlpatterns = [
+    path("", HomePageView.as_view()),
     path("admin/", admin.site.urls),
-    path('', include('authentication.urls')),
+    path("remaster/", include('remaster.urls'), name='remaster'),
+    path("auth/", include('authentication.urls')),
+    path("", include("rest_framework.urls", namespace="rest_framework")),
 ]

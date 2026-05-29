@@ -132,10 +132,11 @@ class Parser(IcaMixin):
                 trained = True
             if trained:
                 action_prq = []
-                if isinstance(action["prerequisite"], str):
-                    action_prq.append(action["prerequisite"])
-                if isinstance(action["prerequisite"], list):
-                    action_prq.append(action["prerequisite"])
+                if "prerequisite" in action.keys():
+                    if isinstance(action["prerequisite"], str):
+                        action_prq.append(action["prerequisite"])
+                    if isinstance(action["prerequisite"], list):
+                        action_prq.append(action["prerequisite"])
                 if plate.category == "skills":
                     action_prq.append(f"Trained in {name}")
                 else:

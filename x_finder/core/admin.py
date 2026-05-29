@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Source
+from core.models import Source
 
 
 class SourceAdmin(admin.ModelAdmin):

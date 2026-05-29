@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>X-Finder-API</title>
+</head>
+<body>
+    <header>
+        <nav>
+            {% if auths %}
+        <ul>
+        {% for auth in auths %}
+            <li>
+                <a href="/{{ app }}/">
+                    {{ auth }}
+                </a>
+            </li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p> Login not available.</p>
+        {% endif %}
+        </nav>
+        <h1>X-Finder API</h1>
+        <p>Click the links below to browse each App end point</p>
+    </header>
+    <main>
+        {% if apps %}
+        <ul>
+        {% for app in apps %}
+            <li>
+                <a href="/{{ app }}/">
+                    <h2>
+                        {{ app }} : list off end points
+                    </h2>
+                </a>
+            </li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p>No app available.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

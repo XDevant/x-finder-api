@@ -75,6 +75,7 @@ class SQL:
         if self.columns is None:
             return []
         for column in self.columns:
+            column = column.replace("'", "_")
             if column != "name" or table_name == "links" or "quality" in self.columns or "x_finder_related_item" in self.columns:
                 typed_cols.append(f"'{column}' TEXT")
             else:

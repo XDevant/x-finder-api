@@ -50,7 +50,10 @@ class Reader(IcaMixin):
                     value = self.remove_description_from_value(status, result, value)
                     status.loaded_values.append(value)
             case "new_title":
-                nested_category = self.find_nested_item_category(key, href, category=category)
+                nested_category = self.find_nested_item_category(key,
+                                                                 href,
+                                                                 category=category,
+                                                                 current_category=current_category)
                 check_nest = nested_category is not None and nested_category not in ["default", "rules", category]
                 check_key = check_text_col and not nested_category == "actions"
                 print("family:", status.family, "nested_category:", nested_category)
@@ -78,7 +81,7 @@ class Reader(IcaMixin):
                         self.describe(value, result, index=index)
                 elif check_nest and not check_text_col:  # check overload for key_terms?
                     self.add_new_title(child, result, status, category=nested_category)
-                    if key in self.lica("text_columns", nested_category):
+                    if nested_category is not None and key in self.lica("text_columns", nested_category):
                         self.load_key_value(status, key, tail)
                 else:  # normal behavior
                     self.load_key_value(status, key, tail)
@@ -235,7 +238,8 @@ class Reader(IcaMixin):
                                   name: str,
                                   url: str,
                                   next_child: Tag | None = None,
-                                  category: str = "default"
+                                  category: str = "default",
+                                  current_category: str = "default"
                                   ) -> str:
         name = name.lower().strip('()[]').replace(' ', '_').replace('-', '_')
         check_category = category in ["causes", "doctrines", "research_field"]
@@ -257,6 +261,7 @@ class Reader(IcaMixin):
             return "equipment_activations"
         if name.endswith("_tasks") and name.startswith("sample_"):
             return "sample_tasks"
+
         name_model = self.sica("", name)
         url_base = url.split('.')[0].strip().lower().replace(' ', '_').replace('-', '_')
         url_model = self.sica("", url_base)
@@ -267,11 +272,13 @@ class Reader(IcaMixin):
                 if not next_text.endswith('s'):
                     next_text += 's'
                 next_model = self.sica("", next_text)
-                if next_model not in ["rules", "default", None]:
+                if next_model is not None and next_model not in ["rules", "default", ""]:
                     return next_model
-        if url_model is not None and url_model not in ["rules", "default", None, ""]:
+        if url_model is not None and url_model not in ["rules", "default", ""]:
+            if current_category == "skill_uses" and url_model == "skills":
+                return "skill_uses"
             return url_model
-        if name_model is not None  and name_model and name_model != "default":
+        if name_model is not None  and name_model not in ["default", ""]:
             return name_model
         return "default"
 
@@ -324,7 +331,7 @@ class Reader(IcaMixin):
         return ""
 
     @staticmethod
-    def find_table_key_name_and_description(status: Status, result: Result, child: Tag, category: str) -> tuple[str]:
+    def find_table_key_name_and_description(status: Status, result: Result, child: Tag, category: str) -> tuple[str, str, str]:
         key, name, description = [""] * 3
         if result.titles[status.ended]["name"].startswith('Table '):
             key, name = U.format_key(text=result.titles[status.ended]["name"])
