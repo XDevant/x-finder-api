@@ -16,97 +16,117 @@ from .mixins import MultipleSerializerMixin
 
 class ActionViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Action.objects.all()
-    serializer_class = ActionSerializerSelector
+    serializer_class = ActionSerializerSelector.list
+    multi_serializer_class = ActionSerializerSelector
 
 
 class AncestrieViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Ancestrie.objects.all()
-    serializer_class = AncestrieSerializerSelector
+    serializer_class = AncestrieSerializerSelector.list
+    multi_serializer_class = AncestrieSerializerSelector
 
 
 class AnimalCompanionViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = AnimalCompanion.objects.all()
-    serializer_class = AnimalCompanionSerializerSelector
+    serializer_class = AnimalCompanionSerializerSelector.list
+    multi_serializer_class = AnimalCompanionSerializerSelector
 
 
 class ArchetypeViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Archetype.objects.all()
-    serializer_class = ArchetypeSerializerSelector
+    serializer_class = ArchetypeSerializerSelector.list
+    multi_serializer_class = ArchetypeSerializerSelector
 
 
 class BackgroundViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Background.objects.all()
-    serializer_class = BackgroundSerializerSelector
+    serializer_class = BackgroundSerializerSelector.list
+    multi_serializer_class = BackgroundSerializerSelector
 
 
 class ClasseViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Classe.objects.all()
-    serializer_class = ClasseSerializerSelector
+    serializer_class = ClasseSerializerSelector.list
+    multi_serializer_class = ClasseSerializerSelector
 
 
 class ConditionViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Condition.objects.all()
-    serializer_class = ConditionSerializerSelector
+    serializer_class = ConditionSerializerSelector.list
+    multi_serializer_class = ConditionSerializerSelector
 
 
 class CreatureViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Creature.objects.all()
-    serializer_class = CreatureSerializerSelector
+    serializer_class = CreatureSerializerSelector.list
+    multi_serializer_class = CreatureSerializerSelector
 
 
 class CurseViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Curse.objects.all()
-    serializer_class = CurseSerializerSelector
+    serializer_class = CurseSerializerSelector.list
+    multi_serializer_class = CurseSerializerSelector
 
 
 class DeitieViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Deitie.objects.all()
-    serializer_class = DeitieSerializerSelector
+    serializer_class = DeitieSerializerSelector.list
+    multi_serializer_class = DeitieSerializerSelector
 
 
 class DiseaseViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Disease.objects.all()
-    serializer_class = DiseaseSerializerSelector
+    serializer_class = DiseaseSerializerSelector.list
+    multi_serializer_class = DiseaseSerializerSelector
 
 
 class DomainViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Domain.objects.all()
-    serializer_class = DomainSerializerSelector
+    serializer_class = DomainSerializerSelector.list
+    multi_serializer_class = DomainSerializerSelector
 
 
 class EquipmentViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Equipment.objects.all()
-    serializer_class = EquipmentSerializerSelector
+    serializer_class = EquipmentSerializerSelector.list
+    multi_serializer_class = EquipmentSerializerSelector
 
 
 class FamiliarViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Familiar.objects.all()
-    serializer_class = FamiliarSerializerSelector
+    serializer_class = FamiliarSerializerSelector.list
+    multi_serializer_class = FamiliarSerializerSelector
 
 
 class FeatureViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Feature.objects.all()
-    serializer_class = FeatureSerializerSelector
+    serializer_class = FeatureSerializerSelector.list
+    multi_serializer_class = FeatureSerializerSelector
 
 
 class HazardViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Hazard.objects.all()
-    serializer_class = HazardSerializerSelector
+    serializer_class = HazardSerializerSelector.list
+    multi_serializer_class = HazardSerializerSelector
 
 
 class HeritageViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Heritage.objects.all()
-    serializer_class = HeritageSerializerSelector
+    serializer_class = HeritageSerializerSelector.list
+    multi_serializer_class = HeritageSerializerSelector
+
 
 
 class PoisonViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Poison.objects.all()
-    serializer_class = PoisonSerializerSelector
+    serializer_class = PoisonSerializerSelector.list
+    multi_serializer_class = PoisonSerializerSelector
 
 
 class SkillViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Skill.objects.all()
-    serializer_class = SkillSerializerSelector
+    serializer_class = SkillSerializerSelector.list
+    multi_serializer_class = SkillSerializerSelector
 
 
 class SourceViewSet(MultipleSerializerMixin, ReadOnlyModelViewSet):
@@ -119,14 +139,17 @@ class SourceViewSet(MultipleSerializerMixin, ReadOnlyModelViewSet):
 
 class SpellViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Spell.objects.all()
-    serializer_class = SpellSerializerSelector
+    serializer_class = SpellSerializerSelector.list
+    multi_serializer_class = SpellSerializerSelector
 
 
 class RitualViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Ritual.objects.all()
-    serializer_class = RitualSerializerSelector
+    serializer_class = RitualSerializerSelector.list
+    multi_serializer_class = RitualSerializerSelector
 
 
 class TraitViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Trait.objects.all()
-    serializer_class = TraitSerializerSelector
+    serializer_class = TraitSerializerSelector.list
+    multi_serializer_class = TraitSerializerSelector

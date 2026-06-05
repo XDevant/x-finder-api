@@ -1,3 +1,4 @@
+import sqlite3
 import sqlite3 as lite
 from pandas import DataFrame
 from .sql import SQL
@@ -10,17 +11,21 @@ class Con:
         self.kwargs = kwargs
 
     def execute_sql(self, sql: str, values: tuple | None = None) -> list:
-        with lite.connect(self.db, **self.kwargs) as conn:
-            conn.row_factory = lite.Row
-            cur = conn.cursor()
-            cur.execute("PRAGMA foreign_keys = ON;")
-            if values is not None:
-                cur.execute(sql, values)
-            else:
-                cur.execute(sql)
-            conn.commit()
-            row_list = cur.fetchall()
-        return row_list
+        try:
+            with lite.connect(self.db, **self.kwargs) as conn:
+                conn.row_factory = lite.Row
+                cur = conn.cursor()
+                cur.execute("PRAGMA foreign_keys = ON;")
+                if values is not None:
+                    cur.execute(sql, values)
+                else:
+                    cur.execute(sql)
+                conn.commit()
+                row_list = cur.fetchall()
+            return row_list
+        except sqlite3.OperationalError as e:
+            print(f"Sqlite Opérational Error: {e}")
+            return []
 
     def run(self,
             name: str,
@@ -40,8 +45,11 @@ class Con:
                 print(sql)
                 self.execute_sql(sql)
                 with lite.connect(self.db, **self.kwargs) as conn:
-                    inserted = df.to_sql(name=name, con=conn, if_exists='append', index=False)
-                    rows_list = [1]*inserted
+                    try:
+                        inserted = df.to_sql(name=name, con=conn, if_exists='append', index=False)
+                        rows_list = [1]*inserted
+                    except sqlite3.OperationalError as e:
+                        print(f"Operational error {e} while saving {name}")
             if action is not None:
                 sql_builder = SQL(action, name, columns=columns, values=values, wheres=wheres)
                 sql = sql_builder.get()

@@ -61,7 +61,7 @@ class Plate:
         usage: if false is returned to a button command, the command will load missing data from db/csv
         """
         completion = status
-        if completion in ["normalized", "modeled"]:
+        if completion in ["normalized"]:
             completion = "completed"
         match completion:
             case "soup":
@@ -77,6 +77,14 @@ class Plate:
                 return False
             case "completed":
                 dfs = self.dfs
+                if dfs is None or not self.__getattribute__(status):
+                    return False
+                filtered_dfs = self.filter_dfs(dfs, category=category, source=source)
+                if filtered_dfs:
+                    return True
+                return False
+            case "modeled":
+                dfs = self.model_dfs
                 if dfs is None or not self.__getattribute__(status):
                     return False
                 filtered_dfs = self.filter_dfs(dfs, category=category, source=source)

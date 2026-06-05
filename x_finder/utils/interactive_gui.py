@@ -134,7 +134,6 @@ class InteractiveGui(GUI):
     def select_table(self, selection) -> None:
         if selection:
             source = None
-            category = None
             group = None
             if self.current_source and selection != "sources":
                 source = self.current_source
@@ -148,17 +147,24 @@ class InteractiveGui(GUI):
                 status = "normalized"
                 if selection == "links":
                     status = "links"
+                if selection.endswith("modeled"):
+                    status = "modeled"
                 if selection != "links":
-                    self.update_category(selection)
+                    self.update_category(selection.split("__")[0])
                 self.use_my_dfs({status: df})
             else:
                 self.say('-- No data Found --')
 
     def execute_sql_cli_entry(self, event) -> None:
         sql = self.get_entry_input("sql_cli_entry")
-        if not sql or self.db is None:
+        db = self.db
+
+        alt_db = self.get_entry_input("kitchen_cli_entry")
+        if alt_db is not None and alt_db:
+            db = self.__getattribute__(alt_db)
+        if not sql or db is None or not db:
             return
-        conn = Con(self.db)
+        conn = Con(db)
         rows = conn.execute_sql(sql)
         count = len(rows)
         if count > 0:
@@ -197,12 +203,13 @@ class InteractiveGui(GUI):
                         args.append(self.__getattribute__(arg.split(".")[1]))
                     else:
                         args.append(arg)
-                try:
-                    command(*arg_list, **kwarg_dict)
-                except AttributeError:
-                    self.say('-- Wrong Input command --')
-                except TypeError:
-                    self.say('-- Unexpected argument --')
+            try:
+                command(*arg_list, **kwarg_dict)
+            except AttributeError:
+                self.say('-- Wrong Input command --')
+                print(commands, arg_list, kwarg_dict)
+            except TypeError:
+                self.say('-- Unexpected argument --')
 
     def get_entry_input(self, name: str)-> str:
         try:
@@ -247,10 +254,18 @@ class InteractiveGui(GUI):
             if key != "links":
                 status = key
                 df = dfs[key]
+                if self.current_category == "sources" and links is None:
+                    try:
+                        links = df[["name", "category", "group", "nethys_url", "soup"]]
+
+                    except KeyError as e:
+                        print(f"Key error: {e}")
+
         name = self.current_source + " " + self.current_category + " " + status
         new_plate = Plate(name=name.strip(), category=self.current_category, title=name + " - From Db")
         new_plate.item_links = links
         if df is not None:
+            new_plate.dfs = {self.current_category: df}
             data_dict = {status: df.to_dict(orient='records')}
             new_plate.data_dict = data_dict
             if status in ["completed", "normalized", "modeled"]:
@@ -258,6 +273,7 @@ class InteractiveGui(GUI):
                 if status != "completed":
                     new_plate.normalized = True
                     if status == "modeled":
+                        new_plate.model_dfs = {self.current_category: df}
                         new_plate.modeled = True
         self.current_plate = new_plate
         self.update_current_labels()

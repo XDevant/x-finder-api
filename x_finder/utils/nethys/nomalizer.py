@@ -1,5 +1,5 @@
 from x_finder.utils.normalizer import Normalizer
-from x_finder.utils.utils import U
+from x_finder.utils.tools import U
 from pandas import DataFrame
 
 
@@ -8,17 +8,19 @@ class TargetNormalizer(Normalizer):
         super().__init__(target, edition)
 
     @staticmethod
-    def norm_sources_df(df: DataFrame) -> None:
-        df["release_date"] = df.apply(lambda r: U.translate_date(str(r["release_date"])), axis=1)
-        df["errata_date"] = df.apply(
-            lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else "-",
-            axis=1)
-        df["errata_version"] = df.apply(
-            lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",
-            axis=1)
-        if "product_page_url" not in df.columns:
-            df["product_page_url"] = None
-        df.rename(columns={'product_page_url': 'paizo_url', 'product_line': 'group'},
+    def post_norm_sources_df(df: DataFrame, category: str) -> None:
+        if "release_date" in df.columns:
+            df["release_date"] = df.apply(lambda r: U.translate_date(str(r["release_date"])), axis=1)
+        if "latest_errata" in df.columns:
+            df["errata_date"] = df.apply(
+                lambda r: U.translate_date(str(r["latest_errata"]).split(' - ')[-1].strip()) if r["latest_errata"] else "-",
+                axis=1)
+            df["errata_version"] = df.apply(
+                lambda r: str(r["latest_errata"]).split(' - ')[0].strip() if r["latest_errata"] else "-",
+                axis=1)
+        if "product_page" not in df.columns:
+            df["product_page"] = "https://store.paizo.com/"
+        df.rename(columns={'product_page': 'paizo_url', 'product_line': 'group'},
                   inplace=True)
 
     def norm_deities_df(self, df: DataFrame) -> None:

@@ -1,7 +1,7 @@
 from interactive_gui import InteractiveGui
 from soupkitchen import SoupKitchen as Kitchen
 from tkinter import END
-
+from x_finder.x_finder.settings import BASE_DIR
 
 def is_kitchen(method):
     def wrapper(self, *args, **kwargs):
@@ -18,6 +18,7 @@ class KitchenGraphic(InteractiveGui):
     completed_to_csv = True
     normalized_to_csv = False
     kitchen: Kitchen | None = None
+    edition_db = ""
 
     def __init__(self) -> None:
         super().__init__()
@@ -33,6 +34,7 @@ class KitchenGraphic(InteractiveGui):
             self.say(f'-- Kitchen   for {self.target} {self.edition} ready--')
             self.say(f'-- Found {self.base_url} for site base url --')
             self.update_current_buttons()
+            self.edition_db = f"{BASE_DIR}\\{self.edition}\\fixtures\\{self.edition}.db"
 
     def update_current_buttons(self) -> None:
         super(KitchenGraphic, self).update_current_buttons()
@@ -108,7 +110,10 @@ class KitchenGraphic(InteractiveGui):
         self.get_plate("links")
         if self.current_plate is not None and self.current_plate.item_links is not None:
             self.kitchen.cook_urls(self.current_plate)
-            self.plate_to_db(self.current_plate, category="links")
+            if self.current_category != "sources":
+                self.plate_to_db(self.current_plate, category="links")
+            else:
+                self.plate_to_db(self.current_plate, category="sources")
             self.say("Links cooked !")
             self.clear_query_lists()
             self.display_df(self.current_plate.item_links)
@@ -201,7 +206,6 @@ class KitchenGraphic(InteractiveGui):
             if self.current_plate.dfs:
                 edition_df = self.current_plate.dfs[self.edition]
                 self.kitchen.H.normalizer.norm_df(edition_df, key="sources", source_name=self.edition)
-                self.kitchen.H.normalizer.norm_sources_df(edition_df)
                 df = edition_df.applymap(str)
                 self.df_to_db(df, name="sources")
                 self.df_to_db(self.current_plate.dfs["sources"], name="sources", db=self.target_db)
@@ -218,6 +222,8 @@ class KitchenGraphic(InteractiveGui):
         if self.current_category:
             self.normalize_selection()
             self.update_display(message='-- Category normalized!--')
+            self.display_category_df(self.current_category)
+            self.plate_to_db(self.current_plate)
         else:
             self.say("No category selected")
             return
@@ -228,6 +234,7 @@ class KitchenGraphic(InteractiveGui):
         if self.current_plate is not None:
             self.kitchen.normalize_dfs(plate=self.current_plate,
                                        source=self.current_source)
+
 
     @is_kitchen
     def fit_item_to_model(self) -> None:
@@ -250,6 +257,14 @@ class KitchenGraphic(InteractiveGui):
         if self.current_plate is not None and self.check_plate(status="normalized"):
             self.kitchen.fit_source_to_model(plate=self.current_plate,
                                              source=self.current_source)
+
+    @is_kitchen
+    def export_model_to_app(self)-> None:
+        self.get_plate("modeled")
+        if self.current_plate is not None and self.check_plate(status="modeled") and self.current_category:
+            if self.current_category in self.current_plate.model_dfs.keys():
+                df = self.current_plate.model_dfs[self.current_category]
+                self.df_to_db(df, self.current_category[:-1], db=self.edition_db)
 
     @is_kitchen
     def update_ica(self):

@@ -1,20 +1,31 @@
-from rest_framework.serializers import HyperlinkedModelSerializer
+from rest_framework.serializers import HyperlinkedModelSerializer, StringRelatedField, CharField
 from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Background, Heritage, Archetype, Domain, Deitie,
                      Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, 
                      AnimalCompanion, Familiar)
 
+# Source - https://stackoverflow.com/a/51831098
+# Posted by zeynel
+# Retrieved 2026-06-02, License - CC BY-SA 4.0
+class CustomCharField(CharField):
+
+    def __init__(self, repr_length, **kwargs):
+        self.repr_length = repr_length
+        super(CustomCharField, self).__init__(**kwargs)
+
+    def to_representation(self, value):
+        return super(CustomCharField, self).to_representation(value)[:self.repr_length]
 
 
 class SourceListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Source
-        fields = ["name", "category", "group", "latest_errata", "release_date", "errata_date"]
+        fields = ["pk", "name", "category", "group", "errata_version", "release_date", "errata_date", "paizo_url"]
 
 
 class SourceDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Source
-        fields = ["name", "category", "group", "latest_errata", "release_date", "errata_date"]
+        fields = ["pk", "name", "category", "group", "errata_version", "release_date", "errata_date", "nethys_url", "paizo_url"]
 
 
 class SourceSerializerSelector:
@@ -24,15 +35,19 @@ class SourceSerializerSelector:
 
 
 class TraitListSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+
     class Meta:
         model = Trait
-        fields = ["name", "subtype", "description", "source", "source_page"]
+        fields = ["pk", "name", "subtype", "description", "source", "source_page"]
 
 
 class TraitDetailSerializer(HyperlinkedModelSerializer):
+    source = SourceDetailSerializer()
+
     class Meta:
         model = Trait
-        fields = ["name", "subtype", "description", "source", "source_page"]
+        fields = ["pk", "name", "subtype", "description", "source", "source_page"]
 
 
 class TraitSerializerSelector:
@@ -60,15 +75,26 @@ class FeatureSerializerSelector:
 
 
 class ClasseListSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+
     class Meta:
         model = Classe
-        fields = ["name", "description"]
+        fields = ["name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception",
+                  "fortitude", "reflex", "will", "skill", "free_skills", "unarmed", "simple", "martial", "advanced",
+                  "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "source", "source_page"]
 
 
 class ClasseDetailSerializer(HyperlinkedModelSerializer):
+    source = SourceDetailSerializer()
+    sum_description = CharField()
+
     class Meta:
         model = Classe
-        fields = ["name", "description"]
+        fields = ["name", "nethys_url", "key_attribute", "alternate_key_attribute", "hit_points", "perception",
+                  "fortitude", "reflex", "will", "skill", "free_skills", "unarmed", "simple", "martial", "advanced",
+                  "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "during_combat_encounters",
+                  "during_social_encounters", "while_exploring", "in_downtime", "you_might", "others_probably",
+                  "sum_description", "source", "source_page"]
 
 
 class ClasseSerializerSelector:
@@ -130,15 +156,19 @@ class HeritageSerializerSelector:
 
 
 class SkillListSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+
     class Meta:
         model = Skill
-        fields = ["name", "description"]
+        fields = ["name", "attribute", "description", "nethys_url", "source"]
 
 
 class SkillDetailSerializer(HyperlinkedModelSerializer):
+    source = SourceDetailSerializer()
+
     class Meta:
         model = Skill
-        fields = ["name", "description"]
+        fields = ["name", "attribute", "description", "nethys_url", "source"]
 
 
 class SkillSerializerSelector:

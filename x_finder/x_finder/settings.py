@@ -36,10 +36,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "authentication",
-    "campaign",
-    "core",
     "utils",
-    "remaster"
+    "core",
+    "remaster",
 ]
 
 MIDDLEWARE = [

@@ -18,8 +18,6 @@ class Modeler(IcaMixin):
 
     def extract_model_df(self, df: DataFrame, key: str) -> DataFrame:
         columns = self.lica("model_columns", key)
-        if "description_links" in df.columns and "description" in columns:
-            columns.append("description_links")
         excluded = self.lica("model_excluded_columns", key)
         if excluded:
             columns = [str(column) for column in df.columns if column not in excluded]

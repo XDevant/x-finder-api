@@ -81,7 +81,7 @@ widgets = {
         "widget": {"bg": "grey", "width": 20, "default": "disabled"},
         "grid": {"padx": 2, "pady": 2},
         "widgets": [{"name": "clear_message_box", "parent": "message", "widget": {}, "grid": {"row": 0, "column": 0}},
-                    {"name": "export_as_csv", "parent": "plate", "widget": {}, "grid": {}},
+                    {"name": "export_model_to_app", "parent": "plate", "widget": {}, "grid": {}},
                     {"name": "extract_sources", "parent": "command", "widget": {}, "grid": {}},
                     {"name": "sort_sources", "parent": "command", "widget": {}, "grid": {}},
                     {"name": "cook_url", "parent": "command", "widget": {}, "grid": {}},

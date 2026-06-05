@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework_nested.routers import DefaultRouter
+
 from .views import (SourceViewSet, TraitViewSet, FeatureViewSet, ClasseViewSet, AncestrieViewSet, ArchetypeViewSet,
                     BackgroundViewSet, HeritageViewSet, SkillViewSet, DomainViewSet, DeitieViewSet, CurseViewSet, 
                     AnimalCompanionViewSet, DiseaseViewSet, ActionViewSet, FamiliarViewSet, HazardViewSet, SpellViewSet,
@@ -36,3 +37,5 @@ router.register(r"Traits", TraitViewSet, basename="Traits")
 urlpatterns = [
     path(r"", include(router.urls), name="Remaster"),
 ]
+
+

@@ -161,9 +161,12 @@ class Dh(IcaMixin):
         return df
 
     def extract_source_links(self, plate: Plate, debug: bool = False, verbose: bool = False) -> None:
-        if plate.soup is None:
+        if plate.soup is not None:
+            soup = plate.soup
+        else:
+            print("No soup found")
             return
-        unsorted_links = self.parser.extract_source_links(plate.soup)
+        unsorted_links = self.parser.extract_source_links(soup)
         links = self.parser.parse_source_links(unsorted_links, plate.name)
         df = pd.DataFrame.from_records(data=links)
         df["source"] = plate.name
@@ -250,7 +253,7 @@ class Dh(IcaMixin):
     def sort_source(self, source: dict[str, str]) -> dict:
         plate = self.cook_url(source["url"], keep_alive=True)
         self.parse_item(plate)
-        if plate.data_dict is None:
+        if plate.data_dict is None or "sources" not in plate.data_dict.keys():
             return {}
         row = plate.data_dict["sources"][0]
         data = {"row": row, "edition": self.parser.get_edition(row), "soup": plate.soup}

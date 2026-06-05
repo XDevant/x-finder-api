@@ -1,5 +1,5 @@
 from bs4.element import Tag
-from utils import U
+from tools import U
 from helpers.helpers import Plate, Result, Status
 from reader import Reader
 from x_finder.utils.mixins.ica import IcaMixin
@@ -28,6 +28,9 @@ class Parser(IcaMixin):
         if plate.soup is None:
             return []
         main = plate.soup.find(id=main_id)
+        if main is None:
+            print(f"Main not found for {plate.name}")
+            return []
         if title_id:
             titles = main.find_all(id=title_id)
         else:
@@ -56,7 +59,12 @@ class Parser(IcaMixin):
                 continue
             title_content = title.get_text(separator=',').split(',')
             title_content = [part.strip(' ,;') for part in title_content]
-            title_dict["name"] = title_content[0]
+            item_name = title_content[0]
+            name_split = item_name.split("(")
+            if len(name_split) > 1 and self.sica("subtype", category=plate.category):
+                item_name = name_split[0]
+                title_dict["subtype"] = name_split[-1].strip(')')
+            title_dict["name"] = item_name
             next_tag = title.next_sibling
             status.start = next_tag
 
@@ -80,7 +88,7 @@ class Parser(IcaMixin):
                 title_links = [link for link in title_links if link['href'] and link['href'] != 'PFS.aspx']
             if title_links:
                 link = title_links[0]
-                title_dict["url"] = link['href']
+                title_dict["url"] = self.sica("base_url") + link['href']
             else:
                 if plate.url:
                     title_dict["url"] = plate.url
@@ -216,7 +224,7 @@ class Parser(IcaMixin):
 
     @staticmethod
     def clean_link_name(name: str) -> str:
-        return name.strip("{} ,;[]'").replace('(', '')
+        return name.strip("{} ,;[]'")
 
     @staticmethod
     def validate_title(title: dict[str, str], result: Result) -> bool:
@@ -298,10 +306,10 @@ class Parser(IcaMixin):
             url = item['href']
             if not name or not url:
                 continue
-
             item_dict = {"name": name, "url": url, "source": source_name}
-            snake_item_category = url.split('.')[0]
+            snake_item_category = url.split('.com/')[-1].split('.')[0]
             item_category = U.snake_to_under(snake_item_category)
+            print(item_category)
             if "Group=" in url and item_category == "sources":
                 item_category += "_group"
             if "General=true" in url:
@@ -315,7 +323,9 @@ class Parser(IcaMixin):
             else:
                 item_dict["status"] = "ko"
             flags.append(item_dict["url"])
+            item_dict["url"] = self.sica("base_url") + url
             category_data.append(item_dict)
+        print(category_data)
         return category_data
 
     def extract_links_by_id(self, plate: Plate, ica_id: str, ica_tag: str) -> list[dict[str, str] | None]:

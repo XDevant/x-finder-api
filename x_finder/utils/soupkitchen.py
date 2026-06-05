@@ -30,9 +30,6 @@ class SoupKitchen:
     def __str__(self) -> str:
         return f"Targeting {str(self.target)} {str(self.edition)}"
 
-    def test(self):
-        print('tested')
-
     def cook_url(self, link: dict[str, str], parser: str = "", keep_alive: bool = True) -> Plate:
         """Sends an url to the provider to get a plate with a soup"""
         plate = self.H.cook_url(link["url"], parser=parser, keep_alive=keep_alive)
@@ -67,6 +64,18 @@ class SoupKitchen:
         if to_csv:
             self.save_source_links(plate)
 
+    def extract_source_links_from_df(self,
+                             plate: Plate,
+                             debug: bool = False,
+                             verbose: bool = False,
+                             to_csv: bool = False
+                             ) -> None:
+        if plate.item_links is None:
+            return
+        for name, soup in zip(plate.item_links["name"].to_list(), plate.item_links["soup"].to_list()):
+            pass
+
+
     def save_source_links(self, plate: Plate, suffix: str = "") -> None:
         new_suffix = "links"
         if suffix:
@@ -89,7 +98,6 @@ class SoupKitchen:
         if plate.dfs is None:
             return
         for category in plate.dfs.keys():
-            print(category)
             self.normalize_df(plate, category, source, validate=False)
         plate.normalized = True
         if plate.model_dfs is not None:
@@ -141,11 +149,13 @@ class SoupKitchen:
             return results, missed
         df = source_plate.item_links
         category_df = df[df["category"] == category]
+        if "nethys_url" in category_df.columns:
+            category_df.rename(columns={"nethys_url": "url"}, inplace=True)
         vectoriel_zip = zip(category_df["name"].to_list(), category_df["url"].to_list(), category_df["soup"].to_list())
         for name, url, soup in vectoriel_zip:
-            link = {"name": name, "url": url, "source": source_plate.name, "category": category}
+            link = {"name": name, "url": str(url), "source": source_plate.name, "category": category}
             if "- From Db" in source_plate.title:
-                item_plate = self.H.recook_soup(name=name, url=url, content=soup)
+                item_plate = self.H.recook_soup(name=name, url=str(url), content=soup)
             else:
                 item_plate = self.cook_url(link=link)
             item_plate.category = category
@@ -167,7 +177,7 @@ class SoupKitchen:
                     results[key] = []
                 results[key] += item_plate.data_dict[key]
             count += 1
-            if debug and count == limit:
+            if not debug and count == limit:
                 break
         if category in results.keys():
             print(f"Extracted {len(results[category])}/{count} items")
@@ -242,7 +252,8 @@ class SoupKitchen:
             group = source["group"]
             if not groups or group.lower() in groups:
                 data = self.H.sort_source(source)
-                source_plate.data_dict[data["edition"]].append(data["row"])
+                if "edition" in data.keys():
+                    source_plate.data_dict[data["edition"]].append(data["row"])
                 if "df" in data.keys():
                     links.append(data["df"])
         links = pd.concat(links)

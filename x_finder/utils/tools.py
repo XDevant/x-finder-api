@@ -80,7 +80,7 @@ class U:
     def clean_text(raw_string):
         if raw_string is None:
             return ''
-        text = raw_string.strip(' ,;\n\r—').replace('\xa0', ' ')
+        text = raw_string.strip(',;\r— ').replace('\xa0', ' ').replace('\n', ' ')
         if text.startswith(']'):
             if len(text) < 2:
                 return ''

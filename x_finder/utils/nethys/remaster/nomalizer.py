@@ -121,26 +121,50 @@ class EditionNormalizer(TargetNormalizer):
         return 0
 
     @staticmethod
-    def norm_backgrounds_df(df: DataFrame, category: str) -> None:
+    def get_in_strings(strings: list[str], needle: str, separator: str = ": ", ignore: str = "") -> str:
+        if isinstance(strings, list) and strings:
+            results =  []
+            for string in strings:
+                if isinstance(string, str) and needle in string and (not ignore or ignore not in string):
+                    result = string.split(separator)[0]
+                    if result not in results:
+                        results.append(result)
+            if results:
+                return ", ".join(results)
+        return ""
+
+    @staticmethod
+    def clean_free_boost(string: str) -> int:
+        if not isinstance(string, str):
+            return 0
+        if "one" in string.lower():
+            return 1
+        if "three" in string.lower():
+            return 3
+        if "two" in string.lower():
+            return 2
+        return 0
+
+    def norm_backgrounds_df(self, df: DataFrame, category: str) -> None:
         if "description_links" in df.columns:
             df["skill"] = df.apply(
-                lambda r: r["description_links"][0].split(": ")[0],
+                lambda r: self.get_in_strings(r["description_links"], ": skills", ignore="Lore:"),
                 axis=1)
             df["lore"] = df.apply(
-                lambda r: [cell.split(": ")[0] for cell in r["description_links"] if "Lore: skill" in cell],
+                lambda r: self.get_in_strings(r["description_links"], "Lore: skill"),
                 axis=1)
             df["skill_feat"] = df.apply(
-                lambda r: [cell.split(": ")[0] for cell in r["description_links"] if ": feat" in cell],
+                lambda r: self.get_in_strings(r["description_links"], ": feat"),
                 axis=1)
-            df["free"] = df.apply(
-                lambda r: [cell.split(" ")[1].lower() for cell in r["description"] if "free attribute boost" in cell],
-                axis=1)
-            df["free"] = df.apply(
-                lambda r: r["free"][0] if isinstance(r["free"], list) else "zero",
-                axis=1
-                                 ).map({"zero": 0, "one": 1, "two": 2, "three": 3})
-            for attribute in ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]:
-                df[attribute] = df.apply(lambda r: r[attribute] if isinstance(r[attribute],bool) else False , axis=1)
+        else:
+            print("no description link")
+        df["free"] = df.apply(
+            lambda r: self.clean_free_boost(self.get_in_strings(r["description"], "free attribute boost", separator=" free")),
+            axis=1)
+        for attribute in ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]:
+            df[attribute] = df.apply(lambda r: r[attribute] if isinstance(r[attribute],bool) else False , axis=1)
+
+
 
     @staticmethod
     def norm_classes_df(df: DataFrame, category: str) -> None:
@@ -156,11 +180,11 @@ class EditionNormalizer(TargetNormalizer):
             df["key_attribute"] = df.apply(
                 lambda r: r["key_attribute"][0].lower() if isinstance(r["key_attribute"], list) else "",
                 axis=1)
-            df["alternate_key_attribute"] = df.apply(
-                lambda r: r["key_attribute"].split(" or ")[-1].strip() if " or " in r["key_attribute"] else "",
+            df["alt_key_attribute"] = df.apply(
+                lambda r: r["key_attribute"].split(" or ")[-1].strip().title() if " or " in r["key_attribute"] else "",
                 axis=1)
             df["key_attribute"] = df.apply(
-                lambda r: r["key_attribute"].split(" or ")[0].strip(),
+                lambda r: r["key_attribute"].split(" or ")[0].strip().title(),
                 axis=1)
         if "saving_throws" in df.columns:
             for save in ["Fortitude", "Reflex", "Will"]:
@@ -170,26 +194,30 @@ class EditionNormalizer(TargetNormalizer):
         if "attacks" in df.columns:
             categories = ["unarmed attacks", "simple weapons", "martial weapons", "advanced weapons"]
             for attack in categories:
-                df[attack.replace(' ', '_')] = df.apply(
+                df[attack.split(" ")[0]] = df.apply(
                     lambda r: ([el.split(" in ")[0].strip() for el in r["attacks"] if attack in el] + ["Untrained"])[0],
                     axis=1)
-            df["favored_weapon"] = df.apply(
+            df["favored"] = df.apply(
                 lambda r: ([el.split(" in ")[0].strip() for el in r["attacks"] if el.strip() and "favored weapon" in el] + ["Untrained"])[0],
                 axis=1)
         if "defenses" in df.columns:
             for armor in ["light armor", "medium armor", "heavy armor"]:
-                df[armor.replace(' ', '_')] = df.apply(
+                df[armor.split(" ")[0]] = df.apply(
                     lambda r: ([el.split(" in ")[0].strip() for el in r["defenses"] if armor in el or "all armor" in el] + ["Untrained"])[0],
                     axis=1)
-            df["unarmored_defense"] = df.apply(
+            df["unarmored"] = df.apply(
                 lambda r: [el.split(" in ")[0].strip() for el in r["defenses"] if "unarmored defense" in el],
                 axis=1)
+        if "spells" in df.columns:
+            df["spells"] = df.apply(lambda r: r["spells"][0].split(" ")[0] if isinstance(r["spells"], list) else "", axis=1)
+        if "class_dc" in df.columns:
+            df["class_dc"] = df.apply(lambda r: r["class_dc"][0].split(" ")[0] if isinstance(r["class_dc"], list) else "", axis=1)
         if "skills" in df.columns:
             df["free_skills"] = df.apply(lambda r: int(r["skills"][-1].split("equal to ")[-1].split(" plus your")[0]), axis=1)
-            df["skills"] = df.apply(lambda r: [el for el in r["skills"] if "Trained in" not in el], axis=1)
-            df["skill_1"] = df.apply(
-                lambda r: "-" if isinstance(r["skills"], list) and len(r["skills"]) == 0 else r["skills"][0],
-                axis=1)
-            df["skill_2"] = df.apply(
-                lambda r: "-" if  isinstance(r["skills"], list) and len(r["skills"]) < 2 else r["skills"][-1],
-                axis=1)
+            df["skills_tt_or"] = df.apply(lambda r: " or ".join([el for el in r["skills"] if len(el.strip()) > 2 and "Trained in" not in el]), axis=1)
+        columns = {name: name.strip('.') for name in df.columns if str(name).endswith("...")}
+        df.rename(columns=columns, inplace=True)
+        print(df.columns)
+
+    def norm_skills_df(self, df: DataFrame, category: str):
+        df["attribute"] = df["attribute"].map(self.att_to_attribute)

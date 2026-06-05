@@ -1,5 +1,5 @@
 import pandas as pd
-from x_finder.utils.helpers.connection import Con
+from utils.helpers.connection import Con
 
 class SqlitePandaMixin:
     db: str | None = None
@@ -12,7 +12,10 @@ class SqlitePandaMixin:
                 return
         conn = Con(db)
         h, r = conn.run(name, df=df)
-        self.__getattribute__("message_box").insert('end', f'-- {len(r)} rows inserted --')
+        try:
+            self.__getattribute__("message_box").insert('end', f'-- {len(r)} rows inserted --')
+        except AttributeError:
+            pass
 
     def db_to_df(self,
                  name: str | None = None,

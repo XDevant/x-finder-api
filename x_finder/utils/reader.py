@@ -1,7 +1,7 @@
 from typing import Literal
 from bs4.element import Tag
 from helpers.helpers import Status, Result
-from utils import U
+from tools import U
 from mixins.ica import IcaMixin
 
 
@@ -41,12 +41,15 @@ class Reader(IcaMixin):
         key, tail = U.format_key(child)
         href = U.get_href(child)
         check_text_col = key and key in self.lica("text_columns", category) + self.lica("text_columns", current_category)
+        check_url_col = status.last_key and status.last_key in self.lica("url_columns", category) + self.lica("url_columns", current_category)
         hint = self.analyse_status_and_tag(child, status, current_category, key)  # return expected command in most case
         if debug:
-            print(key, "tail:", tail, "hint:", hint, check_text_col)
+            print(key, "tail:", tail, "hint:", hint, check_text_col, href, check_url_col)
         match hint:  # new round begins, what is the element about
             case "load":
-                if value:
+                if check_url_col and href:
+                    status.loaded_values.append(href)
+                elif value:
                     value = self.remove_description_from_value(status, result, value)
                     status.loaded_values.append(value)
             case "new_title":
@@ -77,9 +80,8 @@ class Reader(IcaMixin):
                 print(f"nested category: {nested_category}, index:{index}")
                 if index >= 0:  # we have a key that matches a column that stores a bool
                     result.titles[index][key] = True
-                    if tail:
-                        self.describe(value, result, index=index)
-                elif check_nest and not check_text_col:  # check overload for key_terms?
+                    self.describe(value, result, index=index)
+                elif check_nest and not check_text_col and not check_url_col:  # check overload for key_terms?
                     self.add_new_title(child, result, status, category=nested_category)
                     if nested_category is not None and key in self.lica("text_columns", nested_category):
                         self.load_key_value(status, key, tail)
@@ -200,11 +202,11 @@ class Reader(IcaMixin):
             if name is None:
                 name = title_parts[0]
             result.titles[status.ended]["name"] = name
-
+            base_url = self.sica("base_url")
             if child.name == 'a' and child['href'] and child['href'] not in [None, "PFS.aspx"]:
-                url = child['href']
+                url = base_url + child['href']
             elif child.name and child.find('a') and child.find('a')['href'] not in [None, "PFS.aspx"]:
-                url = child.find('a')['href']
+                url = base_url + child.find('a')['href']
             elif status.family:
                 url = result.titles[0]["url"]
             else:
@@ -297,7 +299,7 @@ class Reader(IcaMixin):
             key += "_links"
         if key not in result.titles[index].keys():
             result.titles[index][key] = []
-        result.titles[index][key].append(description)
+        result.titles[index][key].append(description.replace('\n', ' '))
 
     def analyse_status_and_tag(self,
                                child: Tag,

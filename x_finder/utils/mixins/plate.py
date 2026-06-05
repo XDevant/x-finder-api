@@ -1,3 +1,5 @@
+import sqlite3
+
 from x_finder.utils.helpers.helpers import Plate
 from .csvpandas import CsvPandasMixin
 from .sqlitepandas import SqlitePandaMixin
@@ -60,7 +62,10 @@ class PlateMixin(SqlitePandaMixin, CsvPandasMixin):
 
     def plate_to_db(self, plate: Plate, category: str | None = None) -> None:
         if category in ["links", "sources"] and plate.item_links is not None:
-            self.df_to_db(plate.item_links, category)
+            try:
+                self.df_to_db(plate.item_links, category)
+            except sqlite3.OperationalError as e:
+                print(f"Sqlite3 Operational Error: {e}")
         status: str = plate.status()
         dfs: dict[str,DataFrame] | None = None
         if status == "normalized":

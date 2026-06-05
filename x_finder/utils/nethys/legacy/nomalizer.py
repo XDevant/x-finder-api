@@ -1,6 +1,6 @@
 from x_finder.utils.nethys.nomalizer import TargetNormalizer
 from pandas import DataFrame
-from x_finder.utils.utils import U
+from x_finder.utils.tools import U
 
 
 class EditionNormalizer(TargetNormalizer):
