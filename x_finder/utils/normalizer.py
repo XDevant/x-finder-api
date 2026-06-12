@@ -66,6 +66,7 @@ class Normalizer(IcaMixin):
             df[column] = df.apply(
                 lambda r: join.join([str(e).strip() for e in r[column] if str(e).strip()]).strip(':') if isinstance(r[column], list) else r[column],
                 axis=1)
+            df.fillna(value="-", inplace=True)
 
     @staticmethod
     def norm_sources(df: DataFrame, source_name: str) -> None:

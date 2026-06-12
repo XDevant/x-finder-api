@@ -9,7 +9,7 @@ class FixtureLoader(SqlitePandaMixin):
     df: DataFrame | None = None
     records: list[dict[str, str]] = []
     fks: list[str] = []
-    tts: list[tuple[str]] = []
+    tts: list[dict[str, str | list[str]]] = []
 
     def __init__(self, model_name: str, app: str ="core", db_path: str | None = None):
         self.app: str = app
@@ -41,8 +41,18 @@ class FixtureLoader(SqlitePandaMixin):
             d_types = {"int": int, "float": float, "bool": bool, "str": str}
             if d_type in d_types.keys():
                 self.df[column] = d_types[d_type](self.df[column])
-            self.df.rename(columns={column: name}, inplace=True)
             if d_type == "fk":
                 self.fks.append(name)
             if d_type.startswith("tt_"):
-                self.tts.append((name, d_type.split('t')[-1], ))
+                arg_list = str(d_type).split("_")
+                condition = ", "
+                defaults = []
+                if len(arg_list) > 1:
+                    condition = " " + arg_list.pop(-1) + " "
+                if len(arg_list) > 1:
+                    defaults = arg_list[1:]
+                if name in self.df.columns:
+                    name += "_"
+                column_dict = {"name": str(name), "condition": condition, "defaults": defaults}
+                self.tts.append(column_dict)
+            self.df.rename(columns={column: name}, inplace=True)

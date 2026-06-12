@@ -1,41 +1,47 @@
 from django.urls import path, include
-from rest_framework_nested.routers import DefaultRouter
+from rest_framework_nested.routers import DefaultRouter, NestedSimpleRouter
 
 from .views import (SourceViewSet, TraitViewSet, FeatureViewSet, ClasseViewSet, AncestrieViewSet, ArchetypeViewSet,
-                    BackgroundViewSet, HeritageViewSet, SkillViewSet, DomainViewSet, DeitieViewSet, CurseViewSet, 
+                    BackgroundViewSet, VersatileHeritageViewSet, SkillViewSet, DomainViewSet, DeitieViewSet, CurseViewSet,
                     AnimalCompanionViewSet, DiseaseViewSet, ActionViewSet, FamiliarViewSet, HazardViewSet, SpellViewSet,
-                    RitualViewSet, EquipmentViewSet, PoisonViewSet, ConditionViewSet, CreatureViewSet)
+                    RitualViewSet, EquipmentViewSet, PoisonViewSet, ConditionViewSet, CreatureViewSet, HeritageViewSet,
+                    LanguageViewSet)
 
 
 
 router = DefaultRouter()
-router.register(r"Ancestries", AncestrieViewSet, basename="Ancestries")
-router.register(r"Backgrounds", BackgroundViewSet, basename="Backgrounds")
-router.register(r"Heritages", HeritageViewSet, basename="Heritages")
-router.register(r"Classes", ClasseViewSet, basename="Classes")
-router.register(r"Equipments", EquipmentViewSet, basename="Equipments")
-router.register(r"Skills", SkillViewSet, basename="Skills")
-router.register(r"Creatures", CreatureViewSet, basename="Creatures")
-router.register(r"Deities", DeitieViewSet, basename="Deities")
-router.register(r"Domains", DomainViewSet, basename="Domains")
-router.register(r"Spells", SpellViewSet, basename="Spells")
-router.register(r"Rituals", RitualViewSet, basename="Rituals")
-router.register(r"AnimalCompanions", AnimalCompanionViewSet, basename="AnimalCompanions")
-router.register(r"Familiars", FamiliarViewSet, basename="Familiars")
-router.register(r"Archetypes", ArchetypeViewSet, basename="Archetypes")
-router.register(r"Actions", ActionViewSet, basename="Actions")
-router.register(r"Conditions", ConditionViewSet, basename="Conditions")
-router.register(r"Features", FeatureViewSet, basename="Features")
-router.register(r"Curses", CurseViewSet, basename="Curses")
-router.register(r"Diseases", DiseaseViewSet, basename="Diseases")
-router.register(r"Hazards", HazardViewSet, basename="Hazards")
-router.register(r"Poisons", PoisonViewSet, basename="Poisons")
-router.register(r"Sources", SourceViewSet, basename="Sources")
-router.register(r"Traits", TraitViewSet, basename="Traits")
+router.register(r"ancestry", AncestrieViewSet, basename="ancestry")
+router.register(r"background", BackgroundViewSet, basename="background")
+router.register(r"versatile-heritage", VersatileHeritageViewSet, basename="versatile-heritage")
+router.register(r"class", ClasseViewSet, basename="classe")
+router.register(r"equipment", EquipmentViewSet, basename="equipment")
+router.register(r"skill", SkillViewSet, basename="skill")
+router.register(r"creature", CreatureViewSet, basename="creature")
+router.register(r"deity", DeitieViewSet, basename="deity")
+router.register(r"domain", DomainViewSet, basename="domain")
+router.register(r"spell", SpellViewSet, basename="spell")
+router.register(r"ritual", RitualViewSet, basename="rituals")
+router.register(r"animal-companions", AnimalCompanionViewSet, basename="animal_companions")
+router.register(r"familiar", FamiliarViewSet, basename="familiar")
+router.register(r"archetype", ArchetypeViewSet, basename="archetype")
+router.register(r"action", ActionViewSet, basename="action")
+router.register(r"condition", ConditionViewSet, basename="condition")
+router.register(r"feature", FeatureViewSet, basename="feature")
+router.register(r"curse", CurseViewSet, basename="curse")
+router.register(r"disease", DiseaseViewSet, basename="disease")
+router.register(r"hazard", HazardViewSet, basename="hazard")
+router.register(r"language", LanguageViewSet, basename="language")
+router.register(r"poison", PoisonViewSet, basename="poison")
+router.register(r"source", SourceViewSet, basename="source")
+router.register(r"trait", TraitViewSet, basename="trait")
+
+heritage_router = NestedSimpleRouter(router, r'ancestry', lookup='ancestrie')
+heritage_router.register(r'heritage', HeritageViewSet, basename='ancestry-heritage')
 
 
 urlpatterns = [
-    path(r"", include(router.urls), name="Remaster"),
+    path("", include(router.urls), name="Remaster"),
+    path('', include(heritage_router.urls)),
 ]
 
 

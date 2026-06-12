@@ -37,3 +37,12 @@ class Proficiency(TextChoices):
     E = "Expert"
     M = "Master"
     L = "Legendary"
+
+
+class Size(TextChoices):
+    T = "Tiny"
+    S = "Small"
+    M = "Medium"
+    L = "Large"
+    H = "Huge"
+    G = "Gargantuan"

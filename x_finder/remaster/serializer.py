@@ -1,13 +1,15 @@
-from rest_framework.serializers import HyperlinkedModelSerializer, StringRelatedField, CharField
-from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Background, Heritage, Archetype, Domain, Deitie,
+from rest_framework.serializers import HyperlinkedModelSerializer, StringRelatedField, CharField, SlugRelatedField
+from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Background, VersatileHeritage, Archetype, Domain, Deitie,
                      Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, 
-                     AnimalCompanion, Familiar)
+                     AnimalCompanion, Familiar, Language, SkillAction, ActionTrait, ClassSkill, ClassFeature, SubClass,
+                     AncestryFeat, AncestryLanguage, Heritage, VersatileHeritageFeat, )
+
+
 
 # Source - https://stackoverflow.com/a/51831098
 # Posted by zeynel
 # Retrieved 2026-06-02, License - CC BY-SA 4.0
 class CustomCharField(CharField):
-
     def __init__(self, repr_length, **kwargs):
         self.repr_length = repr_length
         super(CustomCharField, self).__init__(**kwargs)
@@ -19,7 +21,7 @@ class CustomCharField(CharField):
 class SourceListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Source
-        fields = ["pk", "name", "category", "group", "errata_version", "release_date", "errata_date", "paizo_url"]
+        fields = ["pk", "name", "category", "group", "errata_version", "release_date", "nethys_url", "paizo_url"]
 
 
 class SourceDetailSerializer(HyperlinkedModelSerializer):
@@ -39,7 +41,7 @@ class TraitListSerializer(HyperlinkedModelSerializer):
 
     class Meta:
         model = Trait
-        fields = ["pk", "name", "subtype", "description", "source", "source_page"]
+        fields = ["pk", "name", "subtype", "nethys_url", "description", "source", "source_page"]
 
 
 class TraitDetailSerializer(HyperlinkedModelSerializer):
@@ -47,7 +49,7 @@ class TraitDetailSerializer(HyperlinkedModelSerializer):
 
     class Meta:
         model = Trait
-        fields = ["pk", "name", "subtype", "description", "source", "source_page"]
+        fields = ["pk", "name", "subtype", "nethys_url", "description", "source", "source_page"]
 
 
 class TraitSerializerSelector:
@@ -59,13 +61,13 @@ class TraitSerializerSelector:
 class FeatureListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Feature
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class FeatureDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Feature
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class FeatureSerializerSelector:
@@ -74,27 +76,47 @@ class FeatureSerializerSelector:
     detail = FeatureDetailSerializer
 
 
+class LanguageListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = Language
+        fields = ["pk", "name", "subtype", "nethys_url", "description"]
+
+
+class LanguageDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = Language
+        fields = ["pk", "name", "subtype", "nethys_url", "description"]
+
+
+class LanguageSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = LanguageListSerializer
+    detail = LanguageDetailSerializer
+
+
 class ClasseListSerializer(HyperlinkedModelSerializer):
     source = StringRelatedField()
+    skill_choices = StringRelatedField(many=True)
 
     class Meta:
         model = Classe
-        fields = ["name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception",
-                  "fortitude", "reflex", "will", "skill", "free_skills", "unarmed", "simple", "martial", "advanced",
+        fields = ["pk", "name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception",
+                  "fortitude", "reflex", "will", "skill_choices", "free_skills", "unarmed", "simple", "martial", "advanced",
                   "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "source", "source_page"]
 
 
 class ClasseDetailSerializer(HyperlinkedModelSerializer):
     source = SourceDetailSerializer()
-    sum_description = CharField()
+    skill_choices = StringRelatedField(many=True)
+    features = StringRelatedField(many=True)
 
     class Meta:
         model = Classe
-        fields = ["name", "nethys_url", "key_attribute", "alternate_key_attribute", "hit_points", "perception",
-                  "fortitude", "reflex", "will", "skill", "free_skills", "unarmed", "simple", "martial", "advanced",
-                  "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "during_combat_encounters",
+        fields = ["pk", "name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception",
+                  "fortitude", "reflex", "will", "skill_choices", "free_skills", "unarmed", "simple", "martial", "advanced",
+                  "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "features", "during_combat_encounters",
                   "during_social_encounters", "while_exploring", "in_downtime", "you_might", "others_probably",
-                  "sum_description", "source", "source_page"]
+                  "description", "source", "source_page"]
 
 
 class ClasseSerializerSelector:
@@ -102,16 +124,78 @@ class ClasseSerializerSelector:
     list = ClasseListSerializer
     detail = ClasseDetailSerializer
 
+
+class SubClassListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = SubClass
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class SubClassDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = SubClass
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class SubclassSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = SubClassListSerializer
+    detail = SubClassDetailSerializer
+
+
+class ClassFeatureListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = ClassFeature
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class ClassFeatureDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = ClassFeature
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class ClassFeatureSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = ClassFeatureListSerializer
+    detail = ClassFeatureDetailSerializer
+
+
 class AncestrieListSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+
     class Meta:
         model = Ancestrie
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "hit_points", "size", "speed", "attribute_flaw",
+                  "attribute_bonus_1", "attribute_bonus_2", "free_bonus", "free_languages", "augmented_sense",
+                  "special", "description", "source", "source_page"]
 
 
 class AncestrieDetailSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+    spoken_languages = SlugRelatedField(many=True,
+                                        slug_field='name',
+                                        read_only=True)
+    starting_languages = SlugRelatedField(many=True,
+                                        slug_field='name',
+                                        read_only=True)
+    traits = SlugRelatedField(many=True,
+                             slug_field='name',
+                             read_only=True)
+    heritages = SlugRelatedField(many=True,
+                                 slug_field='name',
+                                 read_only=True)
+    ancestry_feats = SlugRelatedField(many=True,
+                            slug_field='name',
+                            read_only=True)
+
     class Meta:
         model = Ancestrie
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "traits", "hit_points", "size", "speed", "attribute_flaw", "attribute_bonus_1",
+                  "attribute_bonus_2", "free_bonus", "free_languages", "augmented_sense", "special", "heritages", "ancestry_feats",
+                  "spoken_languages", "starting_languages", "you_might", "others_probably", "physical_description", "common_names",
+                  "society", "beliefs", "description", "source", "source_page"]
+        depth = 1
 
 
 class AncestrieSerializerSelector:
@@ -119,34 +203,23 @@ class AncestrieSerializerSelector:
     list = AncestrieListSerializer
     detail = AncestrieDetailSerializer
 
-class BackgroundListSerializer(HyperlinkedModelSerializer):
-    class Meta:
-        model = Background
-        fields = ["name", "description"]
-
-
-class BackgroundDetailSerializer(HyperlinkedModelSerializer):
-    class Meta:
-        model = Background
-        fields = ["name", "description"]
-
-
-class BackgroundSerializerSelector:
-    """Import container for the view, and it's get_serializer method"""
-    list = BackgroundListSerializer
-    detail = BackgroundDetailSerializer
-
 
 class HeritageListSerializer(HyperlinkedModelSerializer):
+    ancestrie = SlugRelatedField(slug_field="name", read_only=True)
+
     class Meta:
         model = Heritage
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "ancestrie", "description"]
 
 
 class HeritageDetailSerializer(HyperlinkedModelSerializer):
+    source = StringRelatedField()
+    traits = StringRelatedField()
+    ancestrie = SlugRelatedField(slug_field="name", read_only=True)
+
     class Meta:
         model = Heritage
-        fields = ["name", "description"]
+        fields = ["pk", "name","nethys_url", "traits", "ancestrie", "description", "source", "source_page"]
 
 
 class HeritageSerializerSelector:
@@ -155,12 +228,84 @@ class HeritageSerializerSelector:
     detail = HeritageDetailSerializer
 
 
+class AncestryFeatListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = AncestryFeat
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class AncestryFeatDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = AncestryFeat
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class AncestryFeatSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = AncestryFeatListSerializer
+    detail = AncestryFeatDetailSerializer
+
+
+class BackgroundListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = Background
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class BackgroundDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = Background
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class BackgroundSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = BackgroundListSerializer
+    detail = BackgroundDetailSerializer
+
+
+class VersatileHeritageListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = VersatileHeritage
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class VersatileHeritageDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = VersatileHeritage
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class VersatileHeritageSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = VersatileHeritageListSerializer
+    detail = VersatileHeritageDetailSerializer
+
+
+class VersatileHeritageFeatListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = VersatileHeritageFeat
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class VersatileHeritageFeatDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = VersatileHeritageFeat
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class VersatileHeritageFeatSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = VersatileHeritageFeatListSerializer
+    detail = VersatileHeritageFeatDetailSerializer
+
+
 class SkillListSerializer(HyperlinkedModelSerializer):
     source = StringRelatedField()
 
     class Meta:
         model = Skill
-        fields = ["name", "attribute", "description", "nethys_url", "source"]
+        fields = ["pk", "name", "nethys_url", "attribute", "description", "nethys_url", "source"]
 
 
 class SkillDetailSerializer(HyperlinkedModelSerializer):
@@ -168,7 +313,7 @@ class SkillDetailSerializer(HyperlinkedModelSerializer):
 
     class Meta:
         model = Skill
-        fields = ["name", "attribute", "description", "nethys_url", "source"]
+        fields = ["pk", "name", "nethys_url", "attribute", "description", "nethys_url", "source"]
 
 
 class SkillSerializerSelector:
@@ -177,16 +322,34 @@ class SkillSerializerSelector:
     detail = SkillDetailSerializer
 
 
+class SkillActionListSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = SkillAction
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class SkillActionDetailSerializer(HyperlinkedModelSerializer):
+    class Meta:
+        model = SkillAction
+        fields = ["pk", "name", "nethys_url", "description"]
+
+
+class SkillActionSerializerSelector:
+    """Import container for the view, and it's get_serializer method"""
+    list = SkillActionListSerializer
+    detail = SkillActionDetailSerializer
+
+
 class ArchetypeListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Archetype
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ArchetypeDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Archetype
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ArchetypeSerializerSelector:
@@ -198,13 +361,13 @@ class ArchetypeSerializerSelector:
 class DomainListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Domain
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DomainDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Domain
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DomainSerializerSelector:
@@ -216,13 +379,13 @@ class DomainSerializerSelector:
 class DeitieListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Deitie
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DeitieDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Deitie
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DeitieSerializerSelector:
@@ -234,13 +397,13 @@ class DeitieSerializerSelector:
 class SpellListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Spell
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class SpellDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Spell
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class SpellSerializerSelector:
@@ -252,13 +415,13 @@ class SpellSerializerSelector:
 class RitualListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Ritual
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class RitualDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Ritual
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class RitualSerializerSelector:
@@ -270,13 +433,13 @@ class RitualSerializerSelector:
 class CreatureListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Creature
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class CreatureDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Creature
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class CreatureSerializerSelector:
@@ -288,13 +451,13 @@ class CreatureSerializerSelector:
 class ConditionListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Condition
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ConditionDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Condition
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ConditionSerializerSelector:
@@ -306,13 +469,13 @@ class ConditionSerializerSelector:
 class CurseListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Curse
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class CurseDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Curse
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class CurseSerializerSelector:
@@ -324,13 +487,13 @@ class CurseSerializerSelector:
 class DiseaseListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Disease
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DiseaseDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Disease
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class DiseaseSerializerSelector:
@@ -342,13 +505,13 @@ class DiseaseSerializerSelector:
 class HazardListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Hazard
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class HazardDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Hazard
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class HazardSerializerSelector:
@@ -360,13 +523,13 @@ class HazardSerializerSelector:
 class PoisonListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Poison
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class PoisonDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Poison
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class PoisonSerializerSelector:
@@ -378,13 +541,13 @@ class PoisonSerializerSelector:
 class ActionListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Action
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ActionDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Action
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class ActionSerializerSelector:
@@ -396,13 +559,13 @@ class ActionSerializerSelector:
 class EquipmentListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Equipment
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class EquipmentDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Equipment
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class EquipmentSerializerSelector:
@@ -414,13 +577,13 @@ class EquipmentSerializerSelector:
 class AnimalCompanionListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = AnimalCompanion
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class AnimalCompanionDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = AnimalCompanion
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class AnimalCompanionSerializerSelector:
@@ -432,13 +595,13 @@ class AnimalCompanionSerializerSelector:
 class FamiliarListSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Familiar
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class FamiliarDetailSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Familiar
-        fields = ["name", "description"]
+        fields = ["pk", "name", "nethys_url", "description"]
 
 
 class FamiliarSerializerSelector:

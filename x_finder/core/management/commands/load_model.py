@@ -23,34 +23,61 @@ class Command(BaseCommand):
             for f_model_name in fixture.fks:
                 foreign_dict[f_model_name] = getattr(models, f_model_name.title())
             many_dict = {}
-            for t_model_tuple in fixture.tts:
-                many_dict[t_model_tuple[0]] = (getattr(models, t_model_tuple[0].title()), t_model_tuple[-1], )
+            for t_model_dict in fixture.tts:
+                name = str(t_model_dict["name"])
+                many_dict[name] = {"model": getattr(models, name.strip("_")[:-1].title()),
+                                   "condition": t_model_dict["condition"],
+                                   "defaults": t_model_dict["defaults"]}
             count: int = 0
             missed: list = []
             for row in fixture.records:
                 for key, value in foreign_dict.items():
-                    fk = value.objects.get(name=row["source"])
-                    row[key] = fk
+                    try:
+                        fk = value.objects.get(name=row[key])
+                        row[key] = fk
+                    except Exception as e:
+                        self.stdout.write(str(e))
+                        self.stdout.write(str(row[key]))
+                        missed.append(row)
+                        continue
+                names_dict: dict[str, list[str] | str] = {key : row.pop(key) for key in many_dict.keys()}
+                for key, value in many_dict.items():
+                    names =str(names_dict[key])
+                    condition = value["condition"]
+                    if "and" in condition:
+                        condition = ", "
+                    names = names.split(condition)
+                    names_dict[key] = [name.strip() for name in names if name.strip()]
                 try:
                     new_obj = model.objects.create(**row)
                     count += 1
                 except Exception as e:
-                    print(e)
+                    self.stdout.write(str(e))
                     missed.append(row)
                 else:
                     for key, value in many_dict.items():
-                        names = row[key]
-                        other_model = value[0]
-                        condition = value[1]
-                        names = names.split(condition)
-                        for name in names:
-                            other_fk = other_model.get(name=name)
-                            getattr(new_obj, key).set(other_fk, 'choice'= condition == 'or')
+                        other_model = value["model"]
+                        condition = value["condition"]
+                        defaults = value["defaults"]
+                        through_defaults = {default.strip(): row.pop(default.strip()) for default in defaults if default.strip()}
+                        if condition == ' or ':
+                            through_defaults['choice'] = True
+                        elif "language" in key:
+                            through_defaults['choice'] = False
+                        for name in names_dict[key]:
+                            try:
+                                other_fk = other_model.objects.get(name=name.strip("_"))
+                            except Exception as e:
+                                self.stdout.write(str(e))
+                                self.stdout.write(str(name))
+                            else:
+                                getattr(new_obj, key.strip("_")).add(other_fk, through_defaults=through_defaults)
+                                self.stdout.write(str(other_fk))
+                                self.stdout.write(str(key))
+                                self.stdout.write(str(through_defaults))
             self.stdout.write(
                 self.style.SUCCESS(str(count))
             )
             self.stdout.write(
                 str(missed)
             )
-
-

@@ -1,15 +1,17 @@
-from .models import (Source, Trait, Classe, Feature, Skill, Ancestrie, Background, Archetype, Heritage, Domain, Deitie,
-                     Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, 
-                     AnimalCompanion, Familiar)
+from .models import (Source, Trait, Classe, Feature, Skill, Ancestrie, Background, Archetype, VersatileHeritage, Domain, Deitie,
+                     Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, Heritage,
+                     AnimalCompanion, Familiar, Language, AncestryFeat)
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from .serializer import (SourceSerializerSelector, TraitSerializerSelector, FeatureSerializerSelector,
                          ClasseSerializerSelector, SkillSerializerSelector, DomainSerializerSelector,
-                         AncestrieSerializerSelector, BackgroundSerializerSelector, HeritageSerializerSelector,
+                         AncestrieSerializerSelector, BackgroundSerializerSelector, VersatileHeritageSerializerSelector,
                          ArchetypeSerializerSelector, DeitieSerializerSelector, SpellSerializerSelector, 
                          RitualSerializerSelector, CreatureSerializerSelector, ConditionSerializerSelector, 
                          CurseSerializerSelector, DiseaseSerializerSelector, HazardSerializerSelector, 
                          PoisonSerializerSelector, ActionSerializerSelector, EquipmentSerializerSelector, 
-                         AnimalCompanionSerializerSelector, FamiliarSerializerSelector)
+                         AnimalCompanionSerializerSelector, FamiliarSerializerSelector, HeritageSerializerSelector,
+                         AncestryFeatSerializerSelector, SubclassSerializerSelector, ClassFeatureSerializerSelector,
+                         SkillActionSerializerSelector, LanguageSerializerSelector, )
 from .mixins import MultipleSerializerMixin
 
 
@@ -24,6 +26,20 @@ class AncestrieViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Ancestrie.objects.all()
     serializer_class = AncestrieSerializerSelector.list
     multi_serializer_class = AncestrieSerializerSelector
+    lookup_field = 'name'
+
+
+class AncestryFeatViewSet(MultipleSerializerMixin, ModelViewSet):
+    queryset = AncestryFeat.objects.prefetch_related('ancestry')
+    serializer_class = AncestryFeatSerializerSelector.list
+    multi_serializer_class = AncestryFeatSerializerSelector
+    lookup_field = 'name'
+
+    def get_queryset(self):
+        ancestry_pk = self.kwargs.get('ancestrie_name')  # Extract author ID from URL
+        if ancestry_pk:
+            return AncestryFeat.objects.filter(ancestry__name=ancestry_pk)
+        return super().get_queryset()
 
 
 class AnimalCompanionViewSet(MultipleSerializerMixin, ModelViewSet):
@@ -111,10 +127,23 @@ class HazardViewSet(MultipleSerializerMixin, ModelViewSet):
 
 
 class HeritageViewSet(MultipleSerializerMixin, ModelViewSet):
-    queryset = Heritage.objects.all()
+    queryset = Heritage.objects.prefetch_related("ancestrie")
     serializer_class = HeritageSerializerSelector.list
     multi_serializer_class = HeritageSerializerSelector
+    lookup_field = 'name'
 
+    def get_queryset(self):
+        ancestry_pk = self.kwargs.get('ancestrie_name')  # Extract ancestry ID from URL
+        qs = super().get_queryset()
+        if ancestry_pk:
+            return qs.filter(ancestrie__name=ancestry_pk.title())
+        return qs
+
+
+class LanguageViewSet(MultipleSerializerMixin, ModelViewSet):
+    queryset = Language.objects.all()
+    serializer_class = LanguageSerializerSelector.list
+    multi_serializer_class = LanguageSerializerSelector
 
 
 class PoisonViewSet(MultipleSerializerMixin, ModelViewSet):
@@ -153,3 +182,9 @@ class TraitViewSet(MultipleSerializerMixin, ModelViewSet):
     queryset = Trait.objects.all()
     serializer_class = TraitSerializerSelector.list
     multi_serializer_class = TraitSerializerSelector
+
+
+class VersatileHeritageViewSet(MultipleSerializerMixin, ModelViewSet):
+    queryset = VersatileHeritage.objects.all()
+    serializer_class = VersatileHeritageSerializerSelector.list
+    multi_serializer_class = VersatileHeritageSerializerSelector

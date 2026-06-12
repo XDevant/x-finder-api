@@ -1,6 +1,6 @@
-from remaster.models.base import Base, Attribute, Proficiency
-from django.db.models import (PROTECT, ForeignKey, CharField, URLField, DateField, TextField, PositiveSmallIntegerField,
-                              ManyToManyField)
+from remaster.models.base import Base, Attribute, Proficiency, Size
+from django.db.models import (PROTECT, CASCADE, ForeignKey, CharField, URLField, DateField, TextField, PositiveSmallIntegerField,
+                              ManyToManyField, BooleanField)
 from django.contrib.admin import display
 
 
@@ -13,9 +13,8 @@ class Source(Base):
     paizo_url = URLField()
 
 
-
 class Trait(Base):
-    subtype = CharField(max_length=25)
+    subtype = CharField(max_length=25, default='-')
     source_page = PositiveSmallIntegerField()
     source = ForeignKey(
         to=Source,
@@ -28,11 +27,50 @@ class Trait(Base):
 
 
 class Feature(Base):
+    subtype = CharField(max_length=25, default='-')
+
+    def __str__(self):
+        return self.name + " - " + self.subtype
+
+
+class Language(Base):
+    subtype = CharField(max_length=25, default='-')
+    source = ForeignKey(
+        to=Source,
+        on_delete=PROTECT,
+        related_name='language_source',
+        null=True,
+        default=None
+    )
+    source_page = PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return self.name + " - " + self.subtype
+
+
+class Action(Base):
+    subtype = CharField(max_length=25, default='-')
+    action = CharField(max_length=15, default="-")
+    critical_success = CharField(max_length=50, default="-")
+    success = CharField(max_length=50, default="-")
+    failure = CharField(max_length=50, default="-")
+    critical_failure = CharField(max_length=50, default="-")
+    traits = ManyToManyField(Trait, through='ActionTrait')
+
+
+class SkillFeat(Base):
     level = PositiveSmallIntegerField(default=0)
+    required_proficiency = CharField(
+        max_length=15,
+        choices=Proficiency,
+        default='Untrained'
+    )
 
 
 class Skill(Base):
     attribute = CharField(max_length=12, choices=Attribute)
+    actions = ManyToManyField(Action, through='SkillAction', related_name='skill_actions')
+    feats = ManyToManyField(SkillFeat, through='SkillThroughFeat', related_name='skill_feats')
     source_page = PositiveSmallIntegerField()
     source = ForeignKey(
         to=Source,
@@ -40,13 +78,65 @@ class Skill(Base):
         related_name='skill_source'
     )
 
+    def __str__(self):
+        return f"{self.name} - {self.attribute}"
 
-class Action(Base):
-    pass
+
+class AncestryFeat(Base):
+    """Model for all ancestry feats, either tied to an ancestry or a versatile héritage, who each have their own TT"""
+    level = PositiveSmallIntegerField(choices={1: 1, 5: 5, 9: 9, 13: 13, 17: 17}, default=1)
+    source = ForeignKey(to=Source, on_delete=PROTECT, related_name='ancestry_feat_source')
+    source_page = PositiveSmallIntegerField(default=0)
+    traits = ManyToManyField(Trait, through='AncestryFeatTrait')
+
+    def __str__(self):
+        return f"{self.name} - {self.level}"
 
 
 class Ancestrie(Base):
-    pass
+    hit_points = PositiveSmallIntegerField(default=2)
+    size = CharField(max_length=12, choices=Size, default='Medium')
+    speed = PositiveSmallIntegerField(default=5)
+    attribute_flaw = CharField(max_length=12, choices=Attribute, default="", blank=True)
+    attribute_bonus_1 = CharField(max_length=12, choices=Attribute, default="", blank=True)
+    attribute_bonus_2 = CharField(max_length=12, choices=Attribute, default="", blank=True)
+    free_bonus = PositiveSmallIntegerField(default=1)
+    augmented_sense = CharField(default="Normal vision")
+    special = CharField(default="-")
+    free_languages = PositiveSmallIntegerField(default=0)
+    you_might = TextField(default="-")
+    others_probably = TextField(default="-")
+    physical_description = TextField(default="-")
+    society = TextField(default="-")
+    beliefs = CharField(default="-")
+    common_names= CharField(default="-")
+    traits = ManyToManyField(Trait, through='AncestryTrait')
+    feats = ManyToManyField(AncestryFeat, through='AncestryThroughFeat', related_name='ancestry_feats')
+    languages = ManyToManyField(Language, through='AncestryLanguage', related_name='ancestry_languages', related_query_name='ancestrylanguages')
+    source = ForeignKey(
+        to=Source,
+        on_delete=PROTECT,
+        related_name='ancestry_source',
+        null=True,
+        default=None
+    )
+    source_page = PositiveSmallIntegerField(default=0)
+
+    @property
+    def spoken_languages(self):
+        return self.languages.filter(ancestry_language_languages__choice=False).filter(ancestry_language_languages__ancestry=self.pk)
+
+    @property
+    def starting_languages(self):
+        return self.languages.filter(ancestry_language_languages__choice=True).filter(ancestry_language_languages__ancestry=self.pk)
+
+    @property
+    def ancestry_feats(self):
+        return self.feats.filter(ancestry_feat_feats__ancestry=self.pk)
+
+    @property
+    def heritages(self):
+        return Heritage.objects.filter(ancestrie=self.pk)
 
 
 class AnimalCompanion(Base):
@@ -58,7 +148,39 @@ class Archetype(Base):
 
 
 class Background(Base):
-    pass
+    boost_choice_1 = CharField(max_length=12, choices=Attribute, default="", blank=True)
+    boost_choice_2 = CharField(max_length=12, choices=Attribute, default="", blank=True)
+    free_boosts = PositiveSmallIntegerField(default=0)
+    skill_training = ForeignKey(
+        to=Skill,
+        on_delete=PROTECT,
+        related_name='skill_training_background',
+        null=True,
+        default=None
+    )
+    lore = CharField(default="Lore: ?")
+    bonus_skill_feat = ForeignKey(
+        to=Feature,
+        on_delete=PROTECT,
+        related_name='bonus_feat_background',
+        null = True,
+        default=None
+    )
+    rarity = ForeignKey(
+        to=Trait,
+        on_delete=PROTECT,
+        related_name='trait_background',
+        null = True,
+        default = None
+    )
+    source = ForeignKey(
+        to=Source,
+        on_delete=PROTECT,
+        related_name='background_source',
+        null=True,
+        default=None
+    )
+    source_page = PositiveSmallIntegerField(default=0)
 
 
 class Classe(Base):
@@ -80,7 +202,7 @@ class Classe(Base):
     heavy = CharField(max_length=10, choices=Proficiency)
     spells = CharField(max_length=10, choices=Proficiency)
     class_dc = CharField(max_length=10, choices=Proficiency)
-    free_skills = PositiveSmallIntegerField()
+    free_skills = PositiveSmallIntegerField(default=0)
     during_combat_encounters = TextField()
     during_social_encounters = TextField()
     while_exploring = TextField()
@@ -93,7 +215,7 @@ class Classe(Base):
         on_delete=PROTECT,
         related_name='source_classes'
     )
-    skills = ManyToManyField(Skill, through='ClassSkill')
+    skill_choices = ManyToManyField(Skill, through='ClassSkill')
     features = ManyToManyField(Feature, through='ClassFeature')
 
     @property
@@ -164,8 +286,34 @@ class Familiar(Base):
 class Hazard(Base):
     pass
 
-class Heritage(Base):
-    pass
+
+class Heritage(Feature):
+    ancestrie = ForeignKey(
+        to=Ancestrie,
+        on_delete=CASCADE,
+        related_name='heritage_ancestry',
+        default=None,
+        null=True
+    )
+    source = ForeignKey(
+        to=Source,
+        on_delete=CASCADE,
+        related_name='heritage_source'
+    )
+    source_page = PositiveSmallIntegerField(default=0)
+    traits = ManyToManyField(Trait, through='HeritageTrait', related_name='heritage_traits')
+
+
+class VersatileHeritage(Feature):
+    source = ForeignKey(
+        to=Source,
+        on_delete=PROTECT,
+        related_name='versatile_heritage_source'
+    )
+    feats = ManyToManyField(AncestryFeat,
+                            through='VersatileHeritageFeat',
+                            related_name='versatile_heritage_feats')
+
 
 class Poison(Base):
     pass
@@ -175,6 +323,10 @@ class Ritual(Base):
 
 class Spell(Base):
     rank = PositiveSmallIntegerField(default=1)
+    arcane = BooleanField(default=False)
+    divine = BooleanField(default=False)
+    occult = BooleanField(default=False)
+    primal = BooleanField(default=False)
     spell_type = CharField(blank=True, default="")
     cast = CharField(blank=True, default="")
     trigger = CharField(blank=True, default="")
@@ -189,9 +341,17 @@ class Spell(Base):
     failure = CharField(blank=True, default="")
     critical_failure = CharField(blank=True, default="")
     heightened = CharField(blank=True, default="")
+    traits = ManyToManyField(Trait, through='SpellTrait', related_name='spell_traits')
 
 
 class SubClass(Base):
+    classe = ForeignKey(
+        to=Classe,
+        on_delete=PROTECT,
+        related_name='classe',
+        null=True,
+        default=None
+    )
     alternate_key_attribute = PositiveSmallIntegerField()
     source_page = PositiveSmallIntegerField()
     source = ForeignKey(
@@ -199,3 +359,5 @@ class SubClass(Base):
         on_delete=PROTECT,
         related_name='subclass_source'
     )
+    features = ManyToManyField(Feature,
+                               through='SubClassFeature')

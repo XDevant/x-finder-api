@@ -43,22 +43,41 @@ class EditionNormalizer(TargetNormalizer):
                 )
 
     def norm_ancestries_df(self, df: DataFrame, category: str) -> None:
-        abilities = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
-        for ability in abilities:
-            df[ability] = df.apply(
-                    lambda r: self.get_ability_modifier(r["attribute_boosts"], r["attribute_flaw"], ability),
-                    axis=1)
-        df["free_boosts"] = df.apply(
+        df["attribute_bonus_1"] = df.apply(
+                lambda r: self.get_in_list(r["attribute_boosts"], index=0),
+                axis=1
+            )
+        df["attribute_bonus_2"] = df.apply(
+            lambda r: self.get_in_list(r["attribute_boosts"], index=1),
+            axis=1
+        )
+        df["attribute_flaw"] = df.apply(
+            lambda r: self.get_in_list(r["attribute_flaw"], index=0),
+            axis=1
+        )
+        df["free_bonus"] = df.apply(
                 lambda r: [c.split(' ')[0] for c in r["attribute_boosts"] if "free" in c.lower()][0] if isinstance(
                     r["attribute_boosts"], list) else "Two",
                 axis=1
             ).map({"Two": 2, "Free": 1})
         df["speed"] = df.apply(lambda r: self.norm_speed(r["speed"]), axis=1)
         df["size"] = df.apply(lambda r: self.first_char(r["size"]), axis=1)
-        df["bonus_languages"] = df.apply(lambda r: self.get_bonus_languages(r["languages"]), axis=1)
-        df["spoken_languages"] = df.apply(lambda r: self.get_spoken_languages(r["languages"]), axis=1)
-        df["language_list"] = df.apply(lambda r: self.get_language_lists(r["languages"]), axis=1)
-        return
+        df["free_languages"] = df.apply(lambda r: self.get_bonus_languages(r["languages"]), axis=1)
+        df["languages__tt_and"] = df.apply(lambda r: self.get_spoken_languages(r["languages"]), axis=1)
+        df["languages__tt_or"] = df.apply(lambda r: self.get_language_lists(r["languages"]), axis=1)
+        df["traits__tt_and"] = df.apply(
+            lambda r: ", ".join(r["traits"]) if isinstance(r["traits"], list) else str(r["traits"]),
+            axis=1)
+        df["common_names"] = df.apply(
+            lambda r: r["names"] if isinstance(r["names"], list) else [] + r["sample_names"] if isinstance(r["sample_names"], list) else [],
+            axis=1)
+        columns = {name: name.strip('.') for name in df.columns if str(name).endswith("...")}
+        df["special"] = df.apply(lambda r: " ".join(r["special"]) if isinstance(r["special"], list) else "-", axis=1)
+        df["augmented_sense"] = df.apply(
+            lambda r: " ".join(r["augmented_sense"]) if isinstance(r["augmented_sense"], list) else "-",
+            axis=1)
+        df.rename(columns=columns, inplace=True)
+
 
     @staticmethod
     def get_bonus_languages(languages: list[str]) -> int:
@@ -67,32 +86,34 @@ class EditionNormalizer(TargetNormalizer):
         for language in languages:
             if language.startswith("Addition"):
                 if " + your Int" in language:
-                    return int(language.split(" + your Int")[0][-1])
+                    start = language.split(" + your Int")[0].strip()
+                    return int(start[-1])
         return 0
 
     @staticmethod
-    def get_language_lists(languages: list[str]) -> list[str]:
+    def get_language_lists(languages: list[str]) -> str:
         language_list: list[str] = []
         check: bool = False
         if not isinstance(languages, list):
-            return language_list
+            return ""
         for language in languages:
             if language.startswith("Addition"):
                 check = True
-            elif check:
+            elif check and language and not language.startswith("and any"):
                 language_list.append(language)
-        return language_list
+        return " or ".join(language_list)
 
     @staticmethod
-    def get_spoken_languages(languages: list[str]) -> list[str]:
+    def get_spoken_languages(languages: list[str]) -> str:
         spoken: list[str] = []
         if not isinstance(languages, list):
-            return spoken
+            return ""
         for language in languages:
             if language.startswith("Addition"):
-                return spoken
+                return ", ".join(spoken)
             spoken.append(language)
-        return spoken
+        return ", ".join(spoken)
+
 
     @staticmethod
     def first_char(string_list: list[str] | str) -> str:
@@ -110,15 +131,12 @@ class EditionNormalizer(TargetNormalizer):
             return int(string_list[0][:-5])//5
         return 0
 
+
     @staticmethod
-    def get_ability_modifier(boosts, flaw, ability):
-        if isinstance(flaw, list) and ability in "".join(flaw).lower():
-            return -1
-        if isinstance(boosts, list):
-            for boost in boosts:
-                if boost and ability in boost.lower():
-                    return 1
-        return 0
+    def get_in_list(string_list: list[str], index: int = 0) -> str:
+        if isinstance(string_list, list) and isinstance(index, int) and len(string_list) > index and not string_list[index].startswith("Two free"):
+            return string_list[index]
+        return "-"
 
     @staticmethod
     def get_in_strings(strings: list[str], needle: str, separator: str = ": ", ignore: str = "") -> str:
@@ -145,6 +163,37 @@ class EditionNormalizer(TargetNormalizer):
             return 2
         return 0
 
+
+    def norm_languages_df(self, df: DataFrame, category: str) -> None:
+        df["subtype"] = df.apply(
+            lambda r: self.get_language_subtype(r),
+            axis=1)
+        df.rename(columns={"ancestries": "ancestries__tt", "regions": "regions__tt", "creatures": "creatures__tt"},
+                  inplace=True)
+
+
+    @staticmethod
+    def get_language_subtype(row: dict[str, list[str] | None | str]) -> str:
+        ancestors = []
+        if "ancestries" in row.keys() and isinstance(row["ancestries"], list):
+            ancestors = row["ancestries"]
+        regions = []
+        name = row["name"]
+        if "regions" in row.keys() and isinstance(row["regions"], list):
+            regions = row["regions"]
+        if ancestors:
+            return "Ancestral"
+        elif regions:
+            return "Regional"
+        elif name in ["Daemonic", "Empyrean", "Diabolic", "Chthonian"]:
+            return "Planar"
+        elif name in ["Pyric", "Petran", "Sussuran", "Thalassic"]:
+            return "Elemental"
+        elif name in ["Wildsong"]:
+            return "Ritual"
+        return "Creatures"
+
+
     def norm_backgrounds_df(self, df: DataFrame, category: str) -> None:
         if "description_links" in df.columns:
             df["skill"] = df.apply(
@@ -156,8 +205,6 @@ class EditionNormalizer(TargetNormalizer):
             df["skill_feat"] = df.apply(
                 lambda r: self.get_in_strings(r["description_links"], ": feat"),
                 axis=1)
-        else:
-            print("no description link")
         df["free"] = df.apply(
             lambda r: self.clean_free_boost(self.get_in_strings(r["description"], "free attribute boost", separator=" free")),
             axis=1)
@@ -214,10 +261,38 @@ class EditionNormalizer(TargetNormalizer):
             df["class_dc"] = df.apply(lambda r: r["class_dc"][0].split(" ")[0] if isinstance(r["class_dc"], list) else "", axis=1)
         if "skills" in df.columns:
             df["free_skills"] = df.apply(lambda r: int(r["skills"][-1].split("equal to ")[-1].split(" plus your")[0]), axis=1)
-            df["skills_tt_or"] = df.apply(lambda r: " or ".join([el for el in r["skills"] if len(el.strip()) > 2 and "Trained in" not in el]), axis=1)
+            df["skills__tt_or"] = df.apply(lambda r: " or ".join([el for el in r["skills"] if len(el.strip()) > 2 and "Trained in" not in el]), axis=1)
         columns = {name: name.strip('.') for name in df.columns if str(name).endswith("...")}
         df.rename(columns=columns, inplace=True)
-        print(df.columns)
 
-    def norm_skills_df(self, df: DataFrame, category: str):
+
+    def norm_heritages_df(self, df: DataFrame, category: str):
+        if "name" in df.columns:
+            df["ancestrie__fk"] = df.apply(
+                lambda  r: r["name"].split(" ")[-1] if len(r["name"].split(" ")) > 1 else "Versatile",
+                axis=1)
+        if "description_links" in df.columns:
+            df["skill_feat"] = df.apply(
+                lambda r: self.get_in_strings(r["description_links"], ": feat"),
+                axis=1)
+            df.rename(columns={"description_links": "links"}, inplace=True)
+
+
+    def norm_domains_df(self, df: DataFrame, category: str) -> None:
+        df["name"] = df.apply(lambda r: r["name"].split(" ")[0], axis=1)
+        df.rename(columns={"domain_spell": "domain_spell__fk",
+                           "advanced_domain_spell": "advanced_domain_spell__fk"},
+                  inplace=True)
+
+
+    def norm_skills_df(self, df: DataFrame, category: str) -> None:
         df["attribute"] = df["attribute"].map(self.att_to_attribute)
+
+
+    def norm_spells_df(self, df: DataFrame, category: str) -> None:
+        for tradition in ["arcane", "divine", "occult", "primal"]:
+            df[tradition] = df.apply(
+                lambda r: True if isinstance(r["traditions"], list) and tradition in r["traditions"] else False,
+                axis=1)
+        df.rename(columns={"traits": "traits__tt"},
+                  inplace=True)

@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Archetype, Background, Heritage, Domain, Deitie,
-                     Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, Familiar,
-                     AnimalCompanion)
+from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Archetype, Background, VersatileHeritage, Domain,
+                     Deitie, Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment,
+                     Familiar, AnimalCompanion)
 
 
 class XfinderAdmin(admin.ModelAdmin):
@@ -61,7 +61,7 @@ class BackgroundAdmin(admin.ModelAdmin):
     ordering = ('name',)
 
 
-class HeritageAdmin(admin.ModelAdmin):
+class VersatileHeritageAdmin(admin.ModelAdmin):
     list_display = ('name',)
     ordering = ('name',)
 
@@ -140,7 +140,7 @@ admin.site.register(Ancestrie, AncestrieAdmin)
 admin.site.register(Archetype, ArchetypeAdmin)
 admin.site.register(Background, BackgroundAdmin)
 admin.site.register(Classe, ClasseAdmin)
-admin.site.register(Heritage, HeritageAdmin)
+admin.site.register(VersatileHeritage, VersatileHeritageAdmin)
 admin.site.register(Skill, SkillAdmin)
 admin.site.register(Deitie, DeitieAdmin)
 admin.site.register(Domain, DomainAdmin)
