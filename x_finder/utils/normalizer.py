@@ -1,6 +1,6 @@
-from tools import U
+from .tools import U
 from pandas import DataFrame
-from x_finder.utils.mixins.ica import IcaMixin
+from .mixins.ica import IcaMixin
 
 
 class Normalizer(IcaMixin):
@@ -52,6 +52,10 @@ class Normalizer(IcaMixin):
         if key != "normalized":
             self.norm_sources(df, source_name=source_name)
         columns = {'url': 'nethys_url', 'source': 'source__fk'}
+        if "traits" in df.columns:
+            df["traits__tt_and"] = df.apply(
+                lambda r: ", ".join(r["traits"]) if isinstance(r["traits"], list) else str(r["traits"]),
+                axis=1)
         if "x_finder_related_model" in df.columns and "subtype" not in df.columns:
             columns['x_finder_related_model'] = "subtype"
         if "subtype" in df.columns and subtype and subtype not in df.columns:

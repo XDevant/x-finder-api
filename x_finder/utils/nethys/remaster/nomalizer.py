@@ -65,9 +65,6 @@ class EditionNormalizer(TargetNormalizer):
         df["free_languages"] = df.apply(lambda r: self.get_bonus_languages(r["languages"]), axis=1)
         df["languages__tt_and"] = df.apply(lambda r: self.get_spoken_languages(r["languages"]), axis=1)
         df["languages__tt_or"] = df.apply(lambda r: self.get_language_lists(r["languages"]), axis=1)
-        df["traits__tt_and"] = df.apply(
-            lambda r: ", ".join(r["traits"]) if isinstance(r["traits"], list) else str(r["traits"]),
-            axis=1)
         df["common_names"] = df.apply(
             lambda r: r["names"] if isinstance(r["names"], list) else [] + r["sample_names"] if isinstance(r["sample_names"], list) else [],
             axis=1)
@@ -294,5 +291,37 @@ class EditionNormalizer(TargetNormalizer):
             df[tradition] = df.apply(
                 lambda r: True if isinstance(r["traditions"], list) and tradition in r["traditions"] else False,
                 axis=1)
-        df.rename(columns={"traits": "traits__tt"},
+        df["action"] = df.apply(
+            lambda r: r["action"].strip('[]') if isinstance(r["action"], str) else r["action"], axis=1)
+        df.rename(columns={"level": "rank"},
                   inplace=True)
+
+    def norm_weapons_df(self,df: DataFrame, category: str) -> None:
+        df["damage_dice_number"] = df.apply(
+            lambda r: r["damage"][0].split("d")[0] if isinstance(r["damage"], list) and r["damage"] else "-",
+            axis=1)
+        df["damage_dice_size"] = df.apply(
+            lambda r: r["damage"][0].split("d")[-1].split(" ")[0] if isinstance(r["damage"], list) and r["damage"] else "-",
+            axis=1)
+        df["damage_type"] = df.apply(
+            lambda r: r["damage"][0].split(" ")[-1] if isinstance(r["damage"], list) and r["damage"] else "-",
+            axis=1)
+        df["range"] = df.apply(
+            lambda r: self.norm_speed(r["range"]),
+            axis=1
+        )
+        df.rename(columns={"group": "group__pk"},
+                  inplace=True)
+
+
+    def norm_armors_df(self,df: DataFrame, category: str) -> None:
+        df.rename(columns={"group": "group__pk"},
+                  inplace=True)
+
+
+    def norm_deities_df(self, df: DataFrame, category: str) -> None:
+        if "cleric_spells" in df.columns:
+            new_columns = ["first_cleric_spell__fk", "second_cleric_spell_rank", "second_cleric_spell__fk",
+                           "third_cleric_spell_rank", "third_cleric_spell__fk"]
+            self.split_column(df, "cleric_spells", new_columns, strip=' ')
+            df.rename(columns={"cleric_spells": "first_cleric_spell_rank"}, inplace=True)

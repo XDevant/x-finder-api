@@ -1,9 +1,10 @@
 from time import time, sleep
 from multiprocessing import Pool
 import pandas as pd
-from selector import Selector
-from helpers.helpers import Plate
-from datahandling import Dh
+from typing import Any, Hashable
+from x_finder.utils.selector import Selector
+from x_finder.utils.helpers.helpers import Plate
+from x_finder.utils.datahandling import Dh
 
 
 def chrono(func):
@@ -23,7 +24,8 @@ class SoupKitchen:
         self.edition: str = edition
         self.parser: str = parser
         selector = Selector("nethys", "remaster")
-        self.H: Dh = selector.handler
+        if selector.handler is not None:
+            self.H: Dh = selector.handler
         self.targets = selector.targets
         self.editions = selector.editions
 
@@ -140,7 +142,7 @@ class SoupKitchen:
                                 limit: int = 20,
                                 debug: bool = False,
                                 verbose: bool = False
-                                ) -> tuple[dict[str, list[dict[str, str]]], dict[str, list[dict[str, str]]]]:
+                                ) -> tuple[dict[str, list[dict[Hashable, Any]]], dict[str, list[dict[Hashable, Any]]]]:
         results = {}
         missed = {}
         tables = {}

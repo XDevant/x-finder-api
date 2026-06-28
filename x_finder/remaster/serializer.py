@@ -1,6 +1,10 @@
-from rest_framework.serializers import HyperlinkedModelSerializer, StringRelatedField, CharField, SlugRelatedField
-from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Background, VersatileHeritage, Archetype, Domain, Deitie,
-                     Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment, 
+from rest_framework.serializers import (HyperlinkedModelSerializer,
+                                        StringRelatedField,
+                                        SlugRelatedField,
+                                        HyperlinkedRelatedField,
+                                        CharField)
+from .models import (Source, Trait, Feature, Classe, Skill, Ancestrie, Background, VersatileHeritage, Archetype, Domain,
+                     Deitie, Spell, Ritual, Creature, Condition, Curse, Disease, Hazard, Poison, Action, Equipment,
                      AnimalCompanion, Familiar, Language, SkillAction, ActionTrait, ClassSkill, ClassFeature, SubClass,
                      AncestryFeat, AncestryLanguage, Heritage, VersatileHeritageFeat, )
 
@@ -359,15 +363,21 @@ class ArchetypeSerializerSelector:
 
 
 class DomainListSerializer(HyperlinkedModelSerializer):
+    domain_spell = HyperlinkedRelatedField(view_name="spell-detail", lookup_field="name", read_only=True)
+    advanced_domain_spell = HyperlinkedRelatedField(view_name="spell-detail", lookup_field="name", read_only=True)
+
     class Meta:
         model = Domain
-        fields = ["pk", "name", "nethys_url", "description"]
+        fields = ["pk", "name", "nethys_url", "domain_spell", "advanced_domain_spell", "description"]
 
 
 class DomainDetailSerializer(HyperlinkedModelSerializer):
+    domain_spell = StringRelatedField()
+    advanced_domain_spell = StringRelatedField()
+
     class Meta:
         model = Domain
-        fields = ["pk", "name", "nethys_url", "description"]
+        fields = ["pk", "name", "nethys_url", "domain_spell", "advanced_domain_spell", "description"]
 
 
 class DomainSerializerSelector:
@@ -395,15 +405,23 @@ class DeitieSerializerSelector:
 
 
 class SpellListSerializer(HyperlinkedModelSerializer):
+    traits = StringRelatedField(many=True)
+    source = StringRelatedField()
+    traditions = StringRelatedField(many=True)
+
     class Meta:
         model = Spell
-        fields = ["pk", "name", "nethys_url", "description"]
+        fields = ["pk", "name", "rank", "nethys_url", "traits", "traditions", "spell_type", "cast", "range", "area", "defense", "targets", "description", "source"]
 
 
 class SpellDetailSerializer(HyperlinkedModelSerializer):
+    traits = StringRelatedField(many=True)
+    source = StringRelatedField()
+    traditions = StringRelatedField(many=True)
+
     class Meta:
         model = Spell
-        fields = ["pk", "name", "nethys_url", "description"]
+        fields = ["pk", "name", "rank", "traits", "traditions", "spell_type", "cast", "trigger", "range", "area", "defense", "targets", "duration", "requirements", "critical_success", "success", "failure", "critical_failure", "heightened", "description", "nethys_url", "source", "source_page"]
 
 
 class SpellSerializerSelector:

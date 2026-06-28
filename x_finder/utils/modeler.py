@@ -1,5 +1,5 @@
 from pandas import DataFrame
-from x_finder.utils.mixins.ica import IcaMixin
+from .mixins.ica import IcaMixin
 
 
 class Modeler(IcaMixin):

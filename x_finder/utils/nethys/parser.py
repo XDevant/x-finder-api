@@ -1,5 +1,5 @@
-from x_finder.utils.parser import Parser
 from .reader import TargetReader
+from x_finder.utils.parser import Parser
 
 
 class TargetParser(Parser):

@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, Hashable
 from pandas import DataFrame
-from bs4.element import Tag
+from bs4.element import Tag, PageElement
 
 
 class Plate:
@@ -26,7 +26,7 @@ class Plate:
         self.name: str = name
         self.category: str = category
         self.item_links: DataFrame | None = None
-        self.data_dict: dict[str, list[dict[str, Any]]] | None = None
+        self.data_dict: dict[str, list[dict[Hashable, Any]]] | None = None
         self.dfs: dict[str, DataFrame] | None = None
         self.model_dfs: dict[str, DataFrame] | None = None
         self.extracted_tables: dict[str, DataFrame] = {}
@@ -55,7 +55,7 @@ class Plate:
             return "links"
         return "empty"
 
-    def check(self, status: str, category: str = None, source: str = None) -> bool:
+    def check(self, status: str, category: str | None = None, source: str | None = None) -> bool:
         """
         checks if the data expected by status is in the Plate. category and source being used as filters
         usage: if false is returned to a button command, the command will load missing data from db/csv
@@ -96,8 +96,8 @@ class Plate:
 
     def filter_dfs(self,
                    dfs: dict[str, DataFrame],
-                   category: str = None,
-                   source: str = None
+                   category: str | None = None,
+                   source: str | None = None
                    ) -> dict[str, DataFrame]:
         filtered_dfs = {}
         if category is None:
@@ -114,7 +114,7 @@ class Plate:
         return filtered_dfs
 
     @staticmethod
-    def filter_df(df: DataFrame | None, category: str = None, source: str = None) -> DataFrame | None:
+    def filter_df(df: DataFrame | None, category: str | None = None, source: str | None = None) -> DataFrame | None:
         if df is None or category is None and source is None:
             return df
         if "category" not in df.columns or "source" not in df.columns:
@@ -138,7 +138,7 @@ class Status:
         self.last_key: str = ""  # we parsed a key and are loading values if truthy,
         self.loaded_values: list = []  # values can be in many nodes. We stack, waiting for end or key identification
         self.family: bool = False  # we expect nested items of the same category in this page
-        self.start: Tag | None = None  # first node after item's title in soup Navigable string
+        self.start: Tag | PageElement | None = None  # first node after item's title in soup Navigable string
 
 
 class Result:
@@ -150,4 +150,4 @@ class Result:
         self.titles: list = []
         self.links: list = []
         self.tails: list = []
-        self.tables: dict[str, DataFrame] = {}
+        self.tables: dict[str, Any] = {}

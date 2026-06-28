@@ -21,7 +21,11 @@ class Command(BaseCommand):
             model = getattr(models, model_name.title())
             foreign_dict = {}
             for f_model_name in fixture.fks:
-                foreign_dict[f_model_name] = getattr(models, f_model_name.title())
+                if f_model_name.endswith("_spell"):
+                    f_model = "Spell"
+                else:
+                    f_model = f_model_name.title()
+                foreign_dict[f_model_name] = getattr(models, f_model)
             many_dict = {}
             for t_model_dict in fixture.tts:
                 name = str(t_model_dict["name"])

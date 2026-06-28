@@ -12,7 +12,7 @@ class SQL:
                  values: tuple | None = None,  # select: where_ph, insert: values
                  wheres: list[str] | None = None,
                  orders: list[str] | None = None,
-                 limit: int = None
+                 limit: int | None = None
                  ) -> None:
         self.action = action
         self.table = " " + table

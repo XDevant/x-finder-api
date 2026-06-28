@@ -67,7 +67,7 @@ class PlateMixin(SqlitePandaMixin, CsvPandasMixin):
             except sqlite3.OperationalError as e:
                 print(f"Sqlite3 Operational Error: {e}")
         status: str = plate.status()
-        dfs: dict[str,DataFrame] | None = None
+        dfs: dict[str, DataFrame] | None = None
         if status == "normalized":
             dfs = plate.dfs
         elif status == "modeled":
@@ -75,7 +75,7 @@ class PlateMixin(SqlitePandaMixin, CsvPandasMixin):
         if dfs is None:
             return
         if category is None:
-            for key, value in dfs:
+            for key, value in dfs.items():
                 name = f"{key}__{status}"
                 self.df_to_db(value, name)
         elif category in dfs.keys():

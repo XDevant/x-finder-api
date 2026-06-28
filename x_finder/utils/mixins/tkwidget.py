@@ -1,5 +1,5 @@
 from tkinter import Label, Listbox, Entry, Button, Scrollbar, Frame, END
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 from x_finder.utils.widgets import widgets as widget_list
 
 
@@ -27,7 +27,7 @@ class TkWidgetMixin:
 
     def initialize_listbox(self, name: str,
                            parent,
-                           widget_options: dict[str, str | int],
+                           widget_options: dict[str, Any],
                            grid_options: dict[str, str | int | tuple[int,int]],
                            other: dict[str, bool] |None = None)-> None:
         if name.startswith("message"):
@@ -36,7 +36,7 @@ class TkWidgetMixin:
             name = name[:-3]
         self.__setattr__(name, Listbox(parent, **widget_options))
         box = self.__getattribute__(name)
-        if "rowspan" in grid_options.keys() and grid_options["rowspan"] > 0:
+        if "rowspan" in grid_options.keys() and isinstance(grid_options["rowspan"], (int, float)) and grid_options["rowspan"] > 0:
             box.grid(**grid_options)
         box.bind('<<ListboxSelect>>', lambda e: self.on_select(name,
                                                                    e.widget.curselection()
@@ -51,7 +51,7 @@ class TkWidgetMixin:
                 span = grid_options["columnspan"]
                 if isinstance(span, int):
                     offset = span
-            if "column" in grid_options.keys():
+            if "column" in grid_options.keys() and isinstance(grid_options["column"], (int, float)):
                 options["column"] = offset + grid_options["column"]
             options['padx'] = (0, 8)
             self.__getattribute__(f"scroll_v_{name}").grid(**options)
@@ -65,13 +65,13 @@ class TkWidgetMixin:
                 span = grid_options["rowspan"]
                 if isinstance(span, int):
                     offset = span
-            if "row" in grid_options.keys():
+            if "row" in grid_options.keys() and isinstance(grid_options["row"], (int, float)):
                 grid_options["row"] = offset + grid_options["row"]
             self.__getattribute__(f"scroll_h_{name}").grid(**grid_options)
 
     def initialize_frame(self, name: str,
                          parent,
-                         widget_options: dict[str, str | int],
+                         widget_options: dict[str, Any],
                          grid_options: dict[str, str | int],
                          other: dict[str, bool] |None = None) -> None:
         self.__setattr__(name, Frame(parent, **widget_options))
@@ -79,7 +79,7 @@ class TkWidgetMixin:
 
     def initialize_label(self, name: str,
                          parent,
-                         widget_options: dict[str, str | int],
+                         widget_options: dict[str, Any],
                          grid_options: dict[str, str | int],
                          other: dict[str, bool] |None = None) -> None:
         if name:
@@ -91,7 +91,7 @@ class TkWidgetMixin:
 
     def initialize_button(self,
                           name: str,
-                          parent, widget_options: dict[str, str | int | Callable],
+                          parent, widget_options: dict[str, Any],
                           grid_options: dict[str, str | int],
                           other: dict[str, bool] | None = None) -> None:
         if name:
@@ -113,7 +113,7 @@ class TkWidgetMixin:
     def initialize_entry(self,
                          name: str,
                          parent,
-                         widget_options: dict[str, str | int | Callable],
+                         widget_options: dict[str, Any],
                          grid_options: dict[str, str | int],
                          other: dict[str, bool] |None = None) -> None:
         self.__setattr__(name, Entry(parent, **widget_options))
@@ -135,7 +135,7 @@ class TkWidgetMixin:
 
     def initialize_widget(self,
                           name: str,
-                          widget: dict[str, str],
+                          widget: dict[str, Any],
                           widget_default: dict[str, str | int],
                           grid_default: dict[str, str | int]) -> None:
         name = name.strip('!').lower()
@@ -148,6 +148,10 @@ class TkWidgetMixin:
         other = None
         if "other" in widget.keys():
             other = widget["other"]
+        if not isinstance(widget["widget"], dict):
+            widget["widget"] = {}
+        if not isinstance(widget["grid"], dict):
+            widget["grid"] = {}
         self.__getattribute__(f"initialize_{name}")(widget_name,
                                                     self.__getattribute__(parent_name),
                                                     {**widget_default, **widget["widget"]},

@@ -1,9 +1,9 @@
 from tkinter import TclError, Event, END
 import pandas as pd
 import os
-from gui import GUI
-from helpers.connection import Con
-from helpers.helpers import Plate
+from x_finder.utils.gui import GUI
+from x_finder.utils.helpers.connection import Con
+from x_finder.utils.helpers.helpers import Plate
 
 
 class InteractiveGui(GUI):

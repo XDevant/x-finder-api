@@ -274,9 +274,6 @@ class Curse(Base):
 class Disease(Base):
     pass
 
-class Domain(Base):
-    pass
-
 class Equipment(Base):
     pass
 
@@ -328,6 +325,7 @@ class Spell(Base):
     occult = BooleanField(default=False)
     primal = BooleanField(default=False)
     spell_type = CharField(blank=True, default="")
+    action = CharField(blank=True, default="")
     cast = CharField(blank=True, default="")
     trigger = CharField(blank=True, default="")
     range = CharField(blank=True, default="")
@@ -342,6 +340,37 @@ class Spell(Base):
     critical_failure = CharField(blank=True, default="")
     heightened = CharField(blank=True, default="")
     traits = ManyToManyField(Trait, through='SpellTrait', related_name='spell_traits')
+    source = ForeignKey(
+        to=Source,
+        on_delete=PROTECT,
+        related_name='spell_source',
+        default=None,
+        null=True
+    )
+    source_page = PositiveSmallIntegerField(default=0)
+
+    @property
+    def traditions(self):
+        answer = []
+        for tradition in ["arcane", "divine", "occult", "primal"]:
+            if self.__getattribute__(tradition):
+                answer.append(tradition)
+        return answer
+
+
+class Domain(Base):
+    domain_spell = ForeignKey(to=Spell,
+                              on_delete=PROTECT,
+                              related_name='domain_spell',
+                              default=None,
+                              null=True)
+    advanced_domain_spell = ForeignKey(to=Spell,
+                                       on_delete=PROTECT,
+                                       related_name='advanced_domain_spell',
+                                       default=None,
+                                       null=True)
+    source = ForeignKey(to=Source, on_delete=PROTECT, default=None, null=True, related_name="domain_source")
+    source_page = PositiveSmallIntegerField(default=0)
 
 
 class SubClass(Base):

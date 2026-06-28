@@ -5,15 +5,15 @@ import sqlite3 as lite
 from os import makedirs
 from importlib import invalidate_caches
 from importlib.util import spec_from_file_location, module_from_spec, LazyLoader
+from typing import Any, Hashable
 
-
-from provider import Provider
-from parser import Parser
-from normalizer import Normalizer
-from modeler import Modeler
+from .provider import Provider
+from .parser import Parser
+from .normalizer import Normalizer
+from .modeler import Modeler
 from x_finder.x_finder.settings import BASE_DIR
-from helpers.helpers import Plate, Status, Result
-from mixins.ica import IcaMixin
+from .helpers.helpers import Plate, Status, Result
+from .mixins.ica import IcaMixin
 
 """Df is not supposed to do much but provide base methods and hooks for each handler that will inherit from Df """
 
@@ -113,7 +113,7 @@ class Dh(IcaMixin):
         return df
 
     def build_dfs(self,
-                  dict_of_lists_of_dicts: dict[str, list[dict[str, str]]],
+                  dict_of_lists_of_dicts: dict[str, list[dict[Hashable, Any]]],
                   source_name: str = "Unknown",
                   suffix: str = "",
                   from_csv: bool = False
@@ -250,7 +250,7 @@ class Dh(IcaMixin):
             return plate
         return None
 
-    def sort_source(self, source: dict[str, str]) -> dict:
+    def sort_source(self, source: dict[Hashable, Any]) -> dict:
         plate = self.cook_url(source["url"], keep_alive=True)
         self.parse_item(plate)
         if plate.data_dict is None or "sources" not in plate.data_dict.keys():

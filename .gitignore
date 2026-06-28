@@ -1,3 +1,7 @@
 /venv/
-/x_finder/utils/fixtures/csv/
-/x_finder/core/fixtures/csv/
+*/*.csv
+**/migrations/**
+*/*.pyc
+*/*.idea
+**/*.db
+**/*.env

@@ -22,10 +22,3 @@ class TargetNormalizer(Normalizer):
             df["product_page"] = "https://store.paizo.com/"
         df.rename(columns={'product_page': 'paizo_url', 'product_line': 'group'},
                   inplace=True)
-
-    def norm_deities_df(self, df: DataFrame) -> None:
-        if "cleric_spells" in df.columns:
-            new_columns = ["first_cleric_spell", "second_cleric_spell_level", "second_cleric_spell",
-                           "third_cleric_spell_level", "third_cleric_spell"]
-            self.split_column(df, "cleric_spells", new_columns, strip=' ')
-            df.rename(columns={"cleric_spells": "first_cleric_spell_level"}, inplace=True)

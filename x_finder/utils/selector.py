@@ -1,16 +1,16 @@
 from typing import Callable, Any
 
-from nethys.selector import EditionSelector as NethysSelector
-from datahandling import Dh
+from x_finder.utils.nethys.selector import EditionSelector as NethysSelector
+from x_finder.utils.datahandling import Dh
 
 
 class Selector:
     handlers: dict[str, Callable[[str, str], Any]] = {"nethys": NethysSelector}
     targets = []
     editions = []
-    handler = None
-    target = None
-    edition = None
+    handler: Dh | None = None
+    target: str | None = None
+    edition: str | None = None
     validated: bool = False
 
     def __init__(self, target: str, edition: str) -> None:
@@ -33,8 +33,9 @@ class Selector:
 
 if __name__ == "__main__":
     H = Selector('nethys', 'remaster').handler
-    print(H.provider.get("base_url"))
-    print(H.get("base_url"))
-    print(H.parser.get("base_url"))
-    print(H.normalizer.get("base_url"))
-    print(H.modeler.get("base_url"))
+    if isinstance(H, Dh):
+        print(H.provider.sica("base_url"))
+        print(H.sica("base_url"))
+        print(H.parser.sica("base_url"))
+        print(H.normalizer.sica("base_url"))
+        print(H.modeler.sica("base_url"))

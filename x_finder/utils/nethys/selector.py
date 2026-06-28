@@ -19,7 +19,7 @@ class EditionSelector:
 if __name__ == "__main__":
     H = EditionSelector('nethys', 'remaster').handler
     if H is not None:
-        print(H.provider.get("base_url"))
+        print(H.provider.sica("base_url"))
         print(H.sica("base_url"))
         print(H.parser.sica("base_url"))
         print(H.normalizer.sica("base_url"))

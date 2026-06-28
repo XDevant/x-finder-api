@@ -1,13 +1,13 @@
 import requests
-import selenium.common
+from selenium.common import exceptions
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
-from helpers.helpers import Plate
+from .helpers.helpers import Plate
 from typing import Any
 from pandas import DataFrame
-from x_finder.utils.mixins.ica import IcaMixin
+from .mixins.ica import IcaMixin
 
 
 class Provider(IcaMixin):
@@ -50,12 +50,12 @@ class Provider(IcaMixin):
         try:
             alert = wait.until(lambda d: d.switch_to.alert)
             alert.accept()
-        except selenium.common.NoAlertPresentException:
+        except exceptions.NoAlertPresentException:
             div = self.driver.find_element(By.CLASS_NAME, "fc-consent-root")
             try:
                 button = div.find_element(By.CLASS_NAME, "fc-cta-consent")
                 button.click()
-            except selenium.common.exceptions.NoSuchElementException:
+            except exceptions.NoSuchElementException:
                 pass
 
     def extract_cookies(self) -> list[dict]:
@@ -150,7 +150,7 @@ class Provider(IcaMixin):
                 category_parts = title_parts[1].split('(')
                 plate.category = category_parts[0].lower().strip('):,;. ').replace(' ', '_')
 
-    def cook_from_html(self, html: str | bytes, parser: str = "") -> BeautifulSoup:
+    def cook_from_html(self, html: str, parser: str = "") -> BeautifulSoup:
         if parser in self.parsers:
             parser = parser
         elif self.parser is not None:
@@ -162,7 +162,7 @@ class Provider(IcaMixin):
         if plate.url:
             self.get_content(plate, keep_alive=keep_alive)
             self.extract_plate_name_and_category(plate)
-            if plate.content:
+            if plate.content and isinstance(plate.content, str):
                 plate.soup = self.cook_from_html(plate.content, parser)
 
     @staticmethod

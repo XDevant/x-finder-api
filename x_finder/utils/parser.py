@@ -1,9 +1,11 @@
 from bs4.element import Tag
-from tools import U
-from helpers.helpers import Plate, Result, Status
-from reader import Reader
-from x_finder.utils.mixins.ica import IcaMixin
+from .tools import U
+from .helpers.helpers import Plate, Result, Status
+from .reader import Reader
+from .mixins.ica import IcaMixin
 from pandas import DataFrame
+from typing import Hashable, Any
+
 
 
 class Parser(IcaMixin):
@@ -95,13 +97,13 @@ class Parser(IcaMixin):
                 else:
                     title_dict["url"] = ""
 
-            if not end_found and not title_links:
+            if not end_found and not title_links and next_tag is not None:
                 next_text = next_tag.get_text()
                 if next_text and isinstance(next_text, str):
                     if "description" not in title_dict.keys():
                         title_dict["description"] = [next_text]
-                    else:
-                        title_dict["description"] += [next_text]
+                    elif isinstance(title_dict["description"], list):
+                        title_dict["description"].append(next_text)
                 if debug:
                     print("Possible fake title spotted")
                 continue
@@ -118,8 +120,8 @@ class Parser(IcaMixin):
 
     def complete_plate(self,
                        plate: Plate,
-                       parsed_rows: dict[str, list[dict[str, list | str]]]
-                       ) -> dict[str, list[dict[str, list | str]]]:
+                       parsed_rows: dict[str, list[dict[Hashable, Any]]]
+                       ) -> dict[str, list[dict[Hashable, Any]]]:
         """
          Missing keys in item dicts will be nan soon. This hook is the right place to add a default value
          for some items missing data.
@@ -159,7 +161,7 @@ class Parser(IcaMixin):
                    result: Result,
                    debug: bool = False,
                    verbose: bool = False
-                   ) -> tuple[dict[str, list[dict[str, str]]], dict[str, DataFrame]]:
+                   ) -> tuple[dict[str, list[dict[Hashable, Any]]], dict[str, DataFrame]]:
         """Here we target the first tag after the title  and call the read_soup method to extract the expected
         key, values and fills the result instance.
 
@@ -240,7 +242,7 @@ class Parser(IcaMixin):
                 return False
         return True
 
-    def sort_sources(self, plate: Plate, editions: list[str]) -> dict[str, dict[str, str]]:
+    def sort_sources(self, plate: Plate, editions: list[str]) -> dict[str, dict[Hashable, Any]]:
         sorted_dict = {}
         if plate.data_dict is None:
             return sorted_dict
@@ -283,7 +285,9 @@ class Parser(IcaMixin):
     def extract_source_links(source_soup: Tag) -> list[Tag]:
         if source_soup:
             try:
-                item_list = source_soup.find(id="main").find_all('u')
+                main = source_soup.find(id="main")
+                if main is not None:
+                    item_list = main.find_all('u')
             except AttributeError:
                 print("No main id in soup")
                 return []
@@ -307,7 +311,7 @@ class Parser(IcaMixin):
             if not name or not url:
                 continue
             item_dict = {"name": name, "url": url, "source": source_name}
-            snake_item_category = url.split('.com/')[-1].split('.')[0]
+            snake_item_category = str(url).split('.com/')[-1].split('.')[0]
             item_category = U.snake_to_under(snake_item_category)
             print(item_category)
             if "Group=" in url and item_category == "sources":
@@ -323,7 +327,7 @@ class Parser(IcaMixin):
             else:
                 item_dict["status"] = "ko"
             flags.append(item_dict["url"])
-            item_dict["url"] = self.sica("base_url") + url
+            item_dict["url"] = self.sica("base_url") + str(url)
             category_data.append(item_dict)
         print(category_data)
         return category_data
@@ -337,17 +341,21 @@ class Parser(IcaMixin):
             if main:
                 main = main.find_all(ica_tag, recursive=True)
             if not main:
-                main = plate.soup.find(id=ica_id).find('nethys-search')
-                print(main)
-                if main and not isinstance(main, int):
-                    print("found table")
-                    main = main.find_all('td', recursive=True)
-                    if not main:
-                        print("No td found")
+                main_id = plate.soup.find(id=ica_id)
+                if main_id is not None:
+                    main = main_id.find('nethys-search')
+                    if main and not isinstance(main, int):
+                        print("found table")
+                        main = main.find_all('td', recursive=True)
+                        if not main:
+                            print("No td found")
+                            return []
+                    else:
+                        print("no table found")
                         return []
                 else:
-                    print("no table found")
-                return []
+                    print("No main found")
+                    return []
             nav_links = []
             for node in main:
                 print(node)

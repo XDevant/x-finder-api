@@ -153,7 +153,7 @@ class U:
         elif '-' in mm_dd_yyyy:
             parts = mm_dd_yyyy.split('-')
         else:
-            return None
+            return "-"
         return f"{parts[-1]}-{parts[0]}-{parts[1]}"
 
     @staticmethod

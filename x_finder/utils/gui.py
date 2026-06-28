@@ -1,14 +1,16 @@
-# coding: utf-8
 import sqlite3
 from tkinter import Tk, TclError, END
 import os
 import pandas as pd
-from x_finder.x_finder.settings import BASE_DIR
-from selector import Selector
-from helpers.connection import Con
-from mixins.tkwidget import TkWidgetMixin
-from mixins.plate import PlateMixin
+from x_finder.utils.selector import Selector
+from x_finder.utils.helpers.connection import Con
+from x_finder.utils.mixins.tkwidget import TkWidgetMixin
+from x_finder.utils.mixins.plate import PlateMixin
+from pathlib import Path
 
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 class GUI(TkWidgetMixin, PlateMixin):
 

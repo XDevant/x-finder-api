@@ -2,7 +2,7 @@ from django.db.models import  Model, TextChoices, CharField, URLField, TextField
 from django.contrib.admin import display
 
 class Base(Model):
-    name = CharField(max_length=25, unique=True)
+    name = CharField(unique=True)
     nethys_url = URLField(default="https://2e.aonprd.com")
     description = TextField(default="", blank=True)
     links = CharField(blank=True, default="")

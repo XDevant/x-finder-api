@@ -1,7 +1,9 @@
-from interactive_gui import InteractiveGui
-from soupkitchen import SoupKitchen as Kitchen
+from x_finder.utils.interactive_gui import InteractiveGui
+from x_finder.utils.soupkitchen import SoupKitchen as Kitchen
 from tkinter import END
 from x_finder.x_finder.settings import BASE_DIR
+
+
 
 def is_kitchen(method):
     def wrapper(self, *args, **kwargs):
@@ -86,7 +88,7 @@ class KitchenGraphic(InteractiveGui):
                     "url": self.current_url,
                     "source": self.current_source,
                     "category": self.current_category}
-            plate = self.kitchen.cook_url(link, keep_alive=False)
+            plate = self.kitchen.cook_url(link, keep_alive=False) # type: ignore
             self.say('-- Plate provided --')
             self.plate_to_db(plate, category="links")
             if plate.soup:
@@ -109,7 +111,7 @@ class KitchenGraphic(InteractiveGui):
     def cook_selection(self) -> None:
         self.get_plate("links")
         if self.current_plate is not None and self.current_plate.item_links is not None:
-            self.kitchen.cook_urls(self.current_plate)
+            self.kitchen.cook_urls(self.current_plate) # type: ignore
             if self.current_category != "sources":
                 self.plate_to_db(self.current_plate, category="links")
             else:
@@ -126,13 +128,13 @@ class KitchenGraphic(InteractiveGui):
         plate = self.current_plate
         if plate is not None:
             if plate.category == "sources":
-                self.kitchen.extract_source_links(plate,
+                self.kitchen.extract_source_links(plate, # type: ignore
                                                   debug=self.debug,
                                                   verbose=self.verbose,
                                                   to_csv=self.links_to_csv)
                 self.plate_to_db(plate,
                                  category="links")
-            self.kitchen.parse_item(plate,
+            self.kitchen.parse_item(plate, # type: ignore
                                     debug=self.debug,
                                     verbose=self.verbose)
             self.normalize_category()
@@ -152,12 +154,12 @@ class KitchenGraphic(InteractiveGui):
             self.update_display(message='-- Unable to find soup to parse --')
             return
         self.say(f'-- Parsing {self.current_category} for {self.current_plate.name} --')
-        self.kitchen.parse_category(self.current_plate,
+        self.kitchen.parse_category(self.current_plate, # type: ignore
                                     self.current_category,
                                     debug=self.debug,
                                     verbose=self.verbose)
-        self.kitchen.normalize_dfs(self.current_plate, self.current_source)
-        self.kitchen.fit_source_to_models(self.current_plate, self.current_source)
+        self.kitchen.normalize_dfs(self.current_plate, self.current_source) # type: ignore
+        self.kitchen.fit_source_to_models(self.current_plate, self.current_source) # type: ignore
         if self.current_plate.dfs is not None:
             for key in self.current_plate.dfs.keys():
                 self.plate_to_db(self.current_plate, category=key)
@@ -168,9 +170,9 @@ class KitchenGraphic(InteractiveGui):
     def parse_selection(self) -> None:
         self.get_plate("soups")
         if self.current_plate and self.current_plate.item_links is not None:
-            self.kitchen.parse_all_category(self.current_plate, debug=self.debug, verbose=self.verbose)
-            self.kitchen.normalize_dfs(self.current_plate, self.current_source)
-            self.kitchen.fit_source_to_models(self.current_plate, self.current_source)
+            self.kitchen.parse_all_category(self.current_plate, debug=self.debug, verbose=self.verbose) # type: ignore
+            self.kitchen.normalize_dfs(self.current_plate, self.current_source) # type: ignore
+            self.kitchen.fit_source_to_models(self.current_plate, self.current_source) # type: ignore
             if self.current_plate.dfs is not None:
                 for key in self.current_plate.dfs.keys():
                     self.plate_to_db(self.current_plate, category=key)
@@ -179,7 +181,7 @@ class KitchenGraphic(InteractiveGui):
 
     @is_kitchen
     def extract_sources(self) -> None:
-        plate = self.kitchen.extract_sources()
+        plate = self.kitchen.extract_sources() # type: ignore
         if plate is not None:
             plate.category = "sources"
             self.current_plate = plate
@@ -202,10 +204,10 @@ class KitchenGraphic(InteractiveGui):
         if not self.current_plate or self.current_plate.item_links is None:
             self.db_to_plate(group=self.current_group, status="unsorted")
         if self.current_plate:
-            self.kitchen.sort_sources_editions(self.current_plate)
+            self.kitchen.sort_sources_editions(self.current_plate) # type: ignore
             if self.current_plate.dfs:
                 edition_df = self.current_plate.dfs[self.edition]
-                self.kitchen.H.normalizer.norm_df(edition_df, key="sources", source_name=self.edition)
+                self.kitchen.H.normalizer.norm_df(edition_df, key="sources", source_name=self.edition) # type: ignore
                 df = edition_df.applymap(str)
                 self.df_to_db(df, name="sources")
                 self.df_to_db(self.current_plate.dfs["sources"], name="sources", db=self.target_db)
@@ -219,7 +221,7 @@ class KitchenGraphic(InteractiveGui):
 
     @is_kitchen
     def normalize_category(self) -> None:
-        if self.current_category:
+        if self.current_category and self.current_plate is not None:
             self.normalize_selection()
             self.update_display(message='-- Category normalized!--')
             self.display_category_df(self.current_category)
@@ -232,7 +234,7 @@ class KitchenGraphic(InteractiveGui):
     def normalize_selection(self) -> None:
         self.get_plate("completed")
         if self.current_plate is not None:
-            self.kitchen.normalize_dfs(plate=self.current_plate,
+            self.kitchen.normalize_dfs(plate=self.current_plate, # type: ignore
                                        source=self.current_source)
 
 
@@ -247,7 +249,7 @@ class KitchenGraphic(InteractiveGui):
             return
         self.get_plate("normalized")
         if self.current_plate is not None and self.check_plate(status="normalized"):
-            self.kitchen.fit_category_to_model(plate=self.current_plate,
+            self.kitchen.fit_category_to_model(plate=self.current_plate, # type: ignore
                                                category=self.current_category,
                                                source=self.current_source)
 
@@ -255,40 +257,40 @@ class KitchenGraphic(InteractiveGui):
     def fit_selection_to_models(self) -> None:
         self.get_plate("normalized")
         if self.current_plate is not None and self.check_plate(status="normalized"):
-            self.kitchen.fit_source_to_model(plate=self.current_plate,
+            self.kitchen.fit_source_to_models(plate=self.current_plate, # type: ignore
                                              source=self.current_source)
 
     @is_kitchen
     def export_model_to_app(self)-> None:
         self.get_plate("modeled")
         if self.current_plate is not None and self.check_plate(status="modeled") and self.current_category:
-            if self.current_category in self.current_plate.model_dfs.keys():
+            if self.current_plate.model_dfs is not None and self.current_category in self.current_plate.model_dfs.keys():
                 df = self.current_plate.model_dfs[self.current_category]
                 self.df_to_db(df, self.current_category[:-1], db=self.edition_db)
 
     @is_kitchen
     def update_ica(self):
-        self.kitchen.reload_ica()
+        self.kitchen.reload_ica() # type: ignore
         self.say('-- Ica updated--')
 
     @is_kitchen
     def update_provider(self) -> None:
-        self.kitchen.update_worker("provider")
+        self.kitchen.update_worker("provider") # type: ignore
         self.say('-- Provider updated--')
 
     @is_kitchen
     def update_parser(self) -> None:
-        self.kitchen.update_worker("parser")
+        self.kitchen.update_worker("parser") # type: ignore
         self.say('-- Parser updated--')
 
     @is_kitchen
     def update_normalizer(self) -> None:
-        self.kitchen.update_worker("normalizer")
+        self.kitchen.update_worker("normalizer") # type: ignore
         self.say('-- Normalizer updated--')
 
     @is_kitchen
     def update_modeler(self) -> None:
-        self.kitchen.update_worker("modeler")
+        self.kitchen.update_worker("modeler") # type: ignore
         self.say('-- Modeler updated--')
 
     def iterate_dfs_display(self) -> None:

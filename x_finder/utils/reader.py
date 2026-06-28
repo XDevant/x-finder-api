@@ -1,8 +1,9 @@
 from typing import Literal
-from bs4.element import Tag
-from helpers.helpers import Status, Result
-from tools import U
-from mixins.ica import IcaMixin
+from bs4.element import Tag, PageElement
+from pandas import DataFrame
+from .helpers.helpers import Status, Result
+from .tools import U
+from .mixins.ica import IcaMixin
 
 
 class Reader(IcaMixin):
@@ -10,13 +11,13 @@ class Reader(IcaMixin):
         self.ica: dict[str, dict[str, str | list[str]]] = {}
 
     def read_soup(self,
-                  child: Tag | None,
+                  child: Tag | PageElement | None,
                   status: Status,
                   result: Result,
                   category: str,
                   debug: bool = False,
                   verbose: bool = False) -> None:
-        if child is None:
+        if child is None or isinstance(child, PageElement):
             return None # block stop
 
         current_category = "default"
@@ -109,7 +110,11 @@ class Reader(IcaMixin):
                 if child.name == "table":
                     table = self.load_nested_table(child)
                 else:
-                    table = self.load_nested_table(child.find('table'))
+                    div = child.find('table')
+                    if isinstance(div, Tag):
+                        table = self.load_nested_table(div)
+                    else:
+                        table = []
                 result.tables[key] = table
             case "describe":
                 values = []
@@ -181,8 +186,8 @@ class Reader(IcaMixin):
                       child: Tag,
                       result: Result,
                       status: Status,
-                      category: str = None,
-                      name: str = None
+                      category: str | None = None,
+                      name: str| None = None
                       ) -> None:
         """
         :param child: NavigableString the HTML child we try to extract data from
@@ -204,11 +209,13 @@ class Reader(IcaMixin):
             result.titles[status.ended]["name"] = name
             base_url = self.sica("base_url")
             if child.name == 'a' and child['href'] and child['href'] not in [None, "PFS.aspx"]:
-                url = base_url + child['href']
-            elif child.name and child.find('a') and child.find('a')['href'] not in [None, "PFS.aspx"]:
-                url = base_url + child.find('a')['href']
+                url = str(base_url) + str(child['href'])
             elif status.family:
                 url = result.titles[0]["url"]
+            elif child.name and isinstance(child.find('a'), Tag):
+                tag = child.find('a')
+                if tag is not None and tag['href'] not in [None, "PFS.aspx"]:
+                    url = str(base_url) + str(tag['href'])
             else:
                 url = ""
             result.titles[status.ended]["url"] = url
@@ -225,7 +232,9 @@ class Reader(IcaMixin):
                     result.titles[status.ended]['level'] = title_parts[-1]
             if 'action' in self.lica("text_columns", category):
                 try:
-                    result.titles[status.ended]['action'] = child.find('span').get_text(' ,;')
+                    span = child.find('span')
+                    if span is not None:
+                        result.titles[status.ended]['action'] = span.get_text(' ,;')
                 except AttributeError:
                     pass
             if category == "monster_abilities":

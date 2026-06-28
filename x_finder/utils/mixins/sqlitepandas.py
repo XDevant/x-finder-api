@@ -1,5 +1,6 @@
 import pandas as pd
-from utils.helpers.connection import Con
+from x_finder.utils.helpers.connection import Con
+from typing import Any
 
 class SqlitePandaMixin:
     db: str | None = None
@@ -20,7 +21,7 @@ class SqlitePandaMixin:
     def db_to_df(self,
                  name: str | None = None,
                  columns: list[str] | None = None,
-                 filters: dict[str,str | None] | None = None,
+                 filters: dict[str, Any] | None = None,
                  db: str | None = None
                  ) -> pd.DataFrame | None:
         if db is None:
