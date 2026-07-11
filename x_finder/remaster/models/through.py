@@ -1,8 +1,9 @@
 from django.db.models import (Model, ForeignKey, BooleanField, PositiveSmallIntegerField, CASCADE, UniqueConstraint,
                              CharField)
 from remaster.models.core import (Trait, Feature, Action, Ancestrie, Classe, SubClass, Skill, VersatileHeritage,
-                                 Language, Heritage, AncestryFeat, SkillFeat, Spell)
+                                 Language, Heritage, AncestryFeat, SkillFeat)
 from remaster.models.base import Proficiency
+from remaster.models.magic import Spell
 
 
 
@@ -271,7 +272,7 @@ class VersatileHeritageFeat(Model):
         ]
 
     def __str__(self):
-        return f"{self.feat.name} - {self.heritage.name}"
+        return f"{self.feat.name if self.feat else 'None'} - {self.heritage.name}"
 
 
 class AncestryFeatTrait(Model):

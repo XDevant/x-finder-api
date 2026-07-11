@@ -1,1 +1,390 @@
-{  "default": {    "base_url": "https://2e.aonprd.com/",    "index_url": "Sources.aspx",    "model_urls": ["Actions.aspx", "Activities.aspx?Category=pk"],    "start_date": 2023,    "app": "utils",    "host_tag": "nethys-search",    "search_id": "results",    "search_tag": "table",    "nav_id": "main",    "main_id": "main",    "title_id": "",    "title_tag": "h1",    "title_class": "title",    "row_start": "a",    "start_tags": ["b"],    "end_tags": ["b", "br", "hr", "h1", "h2", "h3", "table"],    "title_tags": ["h1", "h2", "h3"],    "desc_tags": ["a", "u", "i", "ol", "ul"],    "overload": false,    "item_url_column": "name",    "text_columns": [],    "check_columns": [],    "url_columns": [],    "nested_columns": [],    "nested": false,    "subtype": "",    "name_nest": "",    "no_description": false,    "tail_start": "<br>",    "traits": false,    "model_columns": ["name", "nethys_url", "source__fk", "source_page", "description"],    "model_excluded_columns": [],    "through_columns": []  },  "sources": {    "app": "core",    "text_columns": ["latest_errata", "product_line", "release_date", "product_page"],    "url_columns": ["product_page"],    "model_columns": ["name", "group", "category", "release_date", "errata_date",                      "errata_version", "nethys_url", "paizo_url"]  },  "actions": {    "app": "core",    "text_columns": ["source", "traits", "action", "trigger", "prerequisite", "requirements", "cost",                     "critical_success", "success", "failure", "critical_failure"],    "model_columns": ["name", "subtype", "nethys_url", "action", "trigger", "prerequisite", "requirements",                      "critical_success", "success", "failure", "critical_failure", "cost", "description",                      "source__fk", "source_page"],    "through_columns": ["name", "x_finder_related_model", "x_finder_related_item", "traits"],    "nested": true  },  "ancestries": {    "app": "core",    "text_columns": ["source", "traits", "you_might...", "others_probably...", "physical_description", "society", "beliefs", "names", "sample_names", "hit_points", "size", "speed", "attribute_boosts", "attribute_flaw", "languages", "ethnicities"],    "model_columns": ["name", "nethys_url", "traits__tt_and", "hit_points", "size", "speed", "attribute_flaw", "attribute_bonus_1", "attribute_bonus_2", "free_bonus", "free_languages", "languages__tt_and", "languages__tt_or", "augmented_sense", "special", "you_might", "others_probably", "physical_description", "common_names", "society", "beliefs", "description", "source__fk", "source_page"],    "nested_columns": ["augmented_sense", "augmented_description", "special", "special"],    "through_columns": ["name", "spoken_languages", "language_list", "traits"],    "start_tags": ["b", "h2", "h3"],    "end_tags": ["h1", "h2", "h3", "i"],    "title_tags": []  },  "armor": {    "app": "core",    "text_columns": ["source", "category", "group", "traits", "price", "ac_bonus", "dex_cap", "check_penalty", "speed_penalty", "bulk", "strength", "level"],    "model_columns": ["name", "nethys_url", "category", "group", "price", "ac_bonus", "dex_cap", "check_penalty", "speed_penalty", "bulk", "strength", "level", "description", "source__fk", "source_page"],    "through_columns": ["name", "traits"]  },  "armor_specialization_effects": {    "app": "core",    "nested_columns": ["armor_group", "effect"],    "model_columns": ["name", "effect", "source__fk", "source_page"],    "nested": true  },  "companions": {    "app": "core",    "text_columns": ["source", "size", "str", "dex", "con", "int", "wis", "cha", "hit_points", "skill", "senses", "speed", "special", "support_benefit", "advanced_maneuver"],    "model_columns": ["name", "nethys_url", "size", "str", "dex", "con", "int", "wis", "cha", "hit_points", "skill", "senses", "speed", "special", "support_benefit", "advanced_maneuver", "description", "source__fk", "source_page"]  },  "animal_attacks": {    "app": "core",    "text_columns": ["source", "melee", "ranged", "damage", "action"],    "model_columns": ["name", "nethys_url", "melee", "ranged", "damage", "action", "x_finder_related_model", "description", "source__fk", "source_page", "x_finder_related_item__fk"],    "nested": true  },  "arcane_schools": {    "app": "core",    "text_columns": ["source", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial", "advanced", "curriculum", "school_spells", "no_curriculum"],    "model_columns": ["name", "nethys_url", "initial_focus__fk", "advanced_focus__fk", "description", "source__fk", "source_page"],    "through_columns": ["name", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"],    "start_tags": ["b", null],    "end_tags": ["b", "br"],    "desc_tags": [],    "title_tags": []  },  "arcane_thesis": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "archetypes": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "backgrounds": {    "app": "core",    "text_columns": ["source", "free", "skill", "lore", "skill_feat"],    "check_columns": ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],    "model_columns": ["name", "nethys_url", "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma", "free", "skill", "lore", "skill_feat", "description", "source__fk", "source_page"]  },  "bloodlines": {"app": "core",    "text_columns": ["source", "tradition", "bloodline_skills", "sorcerous_gifts", "bloodline_spells", "blood_magic"],    "model_columns": ["name", "nethys_url", "tradition", "skills", "cantrip", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial_focus", "advanced_focus", "greater_focus", "blood_magic", "description", "source__fk", "source_page"],    "end_tags": ["div", "br"]  },  "causes": {"app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "first_cause_tenet", "second_cause_tenet", "cause_spell__fk", "champions_reaction", "divine_smite", "exalt", "description", "source__fk", "source_page"],    "name_nest": "alignement"  },  "classes": {    "app": "core",    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div", "i"],    "text_columns": ["source", "key_attribute", "hit_points", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "initial_proficiencies", "perception", "saving_throws", "skills", "attacks", "defenses", "spells", "class_dc"],    "model_columns": ["name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception", "fortitude", "reflex", "will", "skills__tt_or", "free_skills", "unarmed", "simple", "martial", "advanced", "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "during_combat_encounters", "during_social_encounters", "while_exploring", "in_downtime", "you_might", "others_probably", "description", "source__fk", "source_page"]  },  "class_features": {    "app": "core",    "text_columns": ["level"],    "start_tags": ["h2"],    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],    "title_tags": ["h1", "h2"],    "nested": true  },  "class_kits": {    "app": "core",    "text_columns": ["source", "price", "bulk", "armor", "weapons", "options", "money_left_over"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "class_optional_features": {    "app": "core",    "text_columns": ["level"],    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],    "nested": true  },  "class_samples": {    "app": "core",    "title_tags": [],    "start_tags": ["b", "h2"],    "overload": true,    "subtype": "class",    "text_columns" : ["source", "attribute_scores", "skills", "starting_feat", "higher_level_feats"],    "model_columns": ["name", "nethys_url", "subclass", "class", "attribute_scores", "skills", "starting_feat", "higher_level_feats", "description", "source__fk", "source_page"]  },  "conditions": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "deities": {    "app": "campaign",    "text_columns": ["source", "category", "edicts", "anathema", "areas_of_concern", "religious_symbol", "sacred_animal", "sacred_color", "pantheons", "divine_attribute", "divine_font", "divine_sanctification", "divine_skill", "favored_weapon", "domains", "alternate_domains", "cleric_spells"],    "model_columns": ["name", "nethys_url", "aka", "category", "edicts", "anathema", "areas_of_concern", "religious_symbol", "sacred_animal", "sacred_color", "divine_attribute", "divine_font", "divine_sanctification", "divine_skill", "favored_weapon__fk", "first_cleric_spell__fk", "first_cleric_spell_rank", "second_cleric_spell__fk", "second_cleric_spell_rank", "third_cleric_spell__fk", "third_cleric_spell_rank", "description", "source__fk", "source_page"],    "through_columns": ["name", "domains", "alternate_domains"],    "subtype": "aka"  },  "diseases": {    "app": "core",    "text_columns": ["source", "traits", "level", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5"],    "model_columns": ["name", "nethys_url", "traits", "level", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5", "description", "x_finder_related_model", "x_finder_related_item__fk", "source__fk", "source_page"],    "through_columns": ["name", "traits"],    "nested": true  },  "divine_intercession": {    "app": "campaign",    "text_columns": ["source", "minor_boon", "moderate_boon", "major_boon", "minor_curse", "moderate_curse", "major_curse"],    "model_columns": ["name", "nethys_url", "minor_boon", "moderate_boon", "major_boon", "minor_curse", "moderate_curse", "major_curse", "description", "x_finder_related_model", "source__fk", "source_page"],    "nested": true  },  "doctrines": {    "app": "core",    "text_columns": ["source", "first_doctrine", "second_doctrine", "third_doctrine", "fourth_doctrine", "fifth_doctrine", "final_doctrine"],    "model_columns": ["name", "nethys_url", "first_doctrine", "second_doctrine", "third_doctrine", "fourth_doctrine", "fifth_doctrine", "final_doctrine", "description", "source__fk", "source_page"]  },  "domains": {    "app": "campaign",    "text_columns": ["source", "deities", "domain_spell", "advanced_domain_spell", "apocryphal_domain_spell", "advanced_apocryphal_domain_spell"],    "model_columns": ["name", "nethys_url", "domain_spell__fk", "advanced_domain_spell__fk", "apocryphal_domain_spell__fk", "advanced_apocryphal_domain_spell__fk", "description", "source__fk", "source_page"]  },  "druidic_orders": {    "app": "core",    "text_columns": ["source", "order_skill", "druid_feat", "order_spell", "anathema"],    "model_columns": ["name", "nethys_url", "skills", "feat", "focus_spell", "anathema", "description", "source_fk", "source_page"]  },  "equipment": {    "app": "core",    "text_columns": ["source", "price", "bulk", "hands", "usage", "ammunition", "craft_requirements", "requirements", "capacity", "access", "critical_success", "success", "failure", "critical_failure", "level"],    "model_columns": ["name", "nethys_url", "price", "bulk", "hands", "usage", "ammunition", "craft_requirements", "capacity", "level", "access", "description", "source__fk", "source_page"],    "subtype": "quality"  },  "equipment_activations": {    "app": "core",    "text_columns": ["source", "activate", "trigger", "frequency", "effect", "critical_success", "success", "failure", "critical_failure"],    "model_columns": ["name", "nethys_url", "activate", "trigger", "frequency", "effect", "critical_success", "success", "failure", "critical_failure", "description", "x_finder_related_model", "x_finder_related_item__fk", "source__fk", "source_page"],    "no_description": true,    "nested": true  },  "familiars": {"app": "core",    "text_columns": ["source", "ability_type"],    "model_columns": ["name", "nethys_url", "ability_type", "description", "source_fk", "source_page"]  },  "feats": {    "app": "core",    "text_columns": ["source", "traits", "archetype", "action", "trigger", "requirements", "prerequisites", "cost", "special", "critical_success", "success", "failure", "critical_failure", "level"],    "model_columns": ["name", "nethys_url", "traits__tt_and", "archetype", "action", "requirements", "prerequisites", "cost", "special", "critical_success", "success", "failure", "critical_failure", "level", "description", "source__fk", "source_page"],    "through_columns": []  },  "hazards": {    "app": "core",    "text_columns": ["source", "traits", "level", "complexity", "stealth", "description", "disable", "routine", "reset", "ac", "for", "ref", "hardness", "hp"],    "model_columns": ["name", "nethys_url", "traits", "level", "complexity", "stealth", "disable", "routine", "reset", "ac", "for", "ref", "hardness", "hp", "description", "source__fk", "source_page"]  },  "heritages": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "ancestrie__fk", "description", "links", "source__fk", "source_page"]  },  "hunters_edges": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "instincts": {    "app": "core",    "text_columns": ["source", "anathema", "instinct_ability", "specialization_ability", "raging_resistance"],    "model_columns": ["name", "nethys_url", "anathema", "instinct_ability", "specialization_ability", "raging_resistance", "description", "source__fk", "source_page"]  },  "key_terms": {    "app": "core",    "text_columns": [],    "model_excluded_columns": ["name", "nethys_url"],    "overload": true,    "nested": true,    "start_tags": ["b", "h2"],    "end_tags": ["b", "hr", "h1", "h2", "h3"],    "desc_tags": ["b", "u", "i", "ol", "ul"]  },  "languages": {    "app": "core",    "text_columns": ["source", "creatures", "ancestries", "npcs", "regions"],    "model_columns": ["name", "nethys_url", "subtype", "description", "ancestries__tt_and", "creatures__tt_and", "regions__tt_and", "source__fk", "source_page"],    "start_tags": ["b", "h2"]  },  "lessons": {    "app": "core",    "text_columns": ["source", "lesson_type"],    "model_columns": ["name", "nethys_url", "type", "focus_spell", "bonus spell", "description", "source__fk", "source_page"]  },  "patrons": {    "app": "core",    "overload": true,    "text_columns": ["source", "spell_list", "patron_skill"],    "model_columns": ["name", "nethys_url","spell_list", "skill", "description", "source__fk", "source_page"]  },  "monsters": {    "app": "core",    "text_columns": ["source", "traits", "level", "recall_knowledge", "unspecific_lore", "specific_lore", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "weaknesses", "speed"],    "model_columns": ["name", "nethys_url", "traits", "cr", "recall_knowledge_skill", "skill_dc", "unspecific_lore_dc", "specific_lore_dc", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "weaknesses", "speed", "description", "source__fk", "source_page"],    "title_tags": ["h3"]  },  "monster_abilities": {    "app": "core",    "text_columns": ["source", "action", "trigger", "effect", "requirements", "frequency", "critical_success", "success", "failure", "critical_failure", "alternative_abilities"],    "model_columns": ["name", "nethys_url", "subtype", "action", "trigger", "effect", "requirements", "frequency", "critical_success", "success", "failure", "critical_failure", "alternative_abilities", "source", "source_page", "x_finder_related_item", "x_finder_related_model", "description"],    "nested": true  },  "monster_attacks": {    "app": "core",    "text_columns": ["source", "melee", "ranged", "damage", "action", "traits"],    "model_columns": ["name", "nethys_url", "melee", "ranged", "damage", "action", "traits", "x_finder_related_item", "x_finder_related_model", "description", "source__fk", "source_page"],    "nested": true  },  "monster_spells": {    "app": "core",    "text_columns": ["source", "10th", "9th", "8th", "7th", "6th", "5th", "4th", "3rd", "2nd", "1st", "cantrips", "constant"],    "model_columns": ["name", "nethys_url", "x_finder_related_item", "x_finder_related_model", "description", "source__fk", "source_page"],    "nested": true  },  "muses": {    "app": "core",    "text_columns": ["source", "muse_feat", "muse_spell"],    "model_columns": ["name", "nethys_url", "bonus_spell", "bonus_feat", "description", "source__fk", "source_page"]  },  "mysteries": {"app": "core",    "text_columns": ["source", "granted_spells", "revelation_spells", "related_domains", "mystery_skill", "oracle_feat"],    "model_columns": ["name", "nethys_url", "bonus_feat", "skills", "granted_cantrip", "granted_1", "granted_2", "granted_3", "granted_4", "granted_5", "granted_6", "granted_7", "granted_8", "granted_9", "initial_focus_spell", "advanced_focus_spell", "greater_focus_spell", "domains", "description", "source__fk", "source_page"],    "end_tags": ["div", "br"]  },  "poisons": {    "app": "core",    "text_columns": ["source", "traits", "level", "saving_throw", "onset", "maximum_duration", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5"],    "model_columns": ["name", "nethys_url", "traits", "saving_throw", "save_dc", "onset", "maximum_duration", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5", "description", "source__fk", "source_page"]  },  "rackets": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "bonus_skill", "key_attribute", "description", "source__fk", "source_page"]  },  "research_fields": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]  },  "rituals": {    "app": "core",    "text_columns": ["source", "traits", "level", "cast", "cost", "secondary_casters", "primary_check", "secondary_checks", "range", "target", "area", "critical_success", "success", "failure", "critical_failure", "heightened"],    "model_columns": ["name", "nethys_url", "traits", "level", "cast", "cost", "secondary_casters", "primary_check", "secondary_checks", "range", "target", "area", "critical_success", "success", "failure", "critical_failure", "heightened", "description", "source__fk", "source_page"]  },  "sample_tasks": {    "app": "core",    "text_columns": ["untrained", "trained", "expert", "master", "legendary"],    "model_columns": ["name", "untrained", "trained", "expert", "master", "legendary", "x_finder_related_item", "x_finder_related_model", "description"],    "nested": true  },  "shields": {    "app": "core",    "text_columns": ["source", "ac_bonus", "speed_penalty", "hardness", "hp", "bulk", "price"],    "model_columns": ["name", "ac_bonus", "speed_penalty", "hardness", "hp", "bulk", "price", "description", "source__fk", "source_page"]  },  "skills": {    "app": "core",    "text_columns": ["source", "subtype"],    "model_columns": ["name", "nethys_url", "attribute", "description", "source__fk", "source_page"],    "title_tags": ["h1", "h3"],    "subtype": "attribute"  },  "skills_general": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "prerequisite", "source__fk", "source_page", "description"],    "title_tags": ["h1", "h2", "h3"],    "subtype": "prerequisite"  },  "skill_uses": {    "app": "core",    "text_columns": [],    "model_columns": ["name", "nethys_url", "description", "x_finder_related_item", "x_finder_related_model"],    "title_tags": ["h1", "h2", "h3", "u"],    "start_tags": ["b"],    "end_tags": ["a", "b", "u", "h1", "h2", "h3"],    "overload": true,    "nested": true  },  "spells": {    "app": "core",    "text_columns": ["source", "traits", "traditions", "bloodline", "deities", "deity", "domain", "cast", "trigger", "range", "area", "defense", "targets", "duration", "requirements", "heightened", "critical_success", "success", "failure", "critical_failure", "level", "spell_type"],    "model_columns": ["name", "nethys_url", "level", "traits__tt_and", "arcane", "divine", "occult", "primal", "spell_type", "action", "cast", "trigger", "range", "area", "defense", "targets", "duration", "requirements", "critical_success", "success", "failure", "critical_failure", "heightened", "description", "source__fk", "source_page"],    "through_columns": [],    "traits": true  },  "tenets": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "nethys_url", "first_tenet", "second_tenet", "description", "source__fk", "source_page"]  },  "traits": {    "app": "core",    "text_columns": ["source"],    "model_columns": ["name", "subtype", "nethys_url", "source_page", "description", "source__fk", "source_page"],    "subtype": "subtype"  },  "weapons": {    "app": "core",    "text_columns": ["source", "traits", "favored_weapon", "price", "damage", "bulk", "hands", "type", "category", "group", "range", "reload", "ammunition"],    "model_columns": ["name", "nethys_url", "traits__tt_and", "type", "category", "weapon_group__fk", "hands", "damage_dice_number", "damage_dice_size", "damage_type", "range", "reload", "description", "source__fk", "source_page"],    "through_columns": [],    "traits": true},  "critical_specialization_effects": {    "app": "core",    "nested_columns": ["weapon_group", "effect"],    "model_columns": ["name", "effect", "source__fk", "source_page"],    "nested": true  }}
+{
+  "default": {
+    "base_url": "https://2e.aonprd.com/",
+    "index_url": "Sources.aspx",
+    "model_urls": ["Actions.aspx", "Activities.aspx?Category=pk"],
+    "start_date": 2023,
+    "app": "utils",
+    "host_tag": "nethys-search",
+    "search_id": "results",
+    "search_tag": "table",
+
+    "nav_id": "main",
+    "main_id": "main",
+    "title_id": "",
+    "title_tag": "h1",
+    "title_class": "title",
+
+    "row_start": "a",
+    "start_tags": ["b"],
+    "end_tags": ["b", "br", "hr", "h1", "h2", "h3", "table"],
+    "title_tags": ["h1", "h2", "h3"],
+    "desc_tags": ["a", "u", "i", "ol", "ul"],
+    "overload": false,
+    "item_url_column": "name",
+    "text_columns": [],
+    "check_columns": [],
+    "url_columns": [],
+    "nested_columns": [],
+    "nested": false,
+    "subtype": "",
+    "name_nest": "",
+    "no_description": false,
+    "tail_start": "<br>",
+    "traits": false,
+
+    "model_columns": ["name", "nethys_url", "source__fk", "source_page", "description"],
+    "model_excluded_columns": [],
+    "through_columns": []
+  },
+  "sources": {
+    "app": "core",
+    "text_columns": ["latest_errata", "product_line", "release_date", "product_page"],
+    "url_columns": ["product_page"],
+    "model_columns": ["name", "group", "category", "release_date", "errata_date",
+                      "errata_version", "nethys_url", "paizo_url"]
+  },
+  "actions": {
+    "app": "core",
+    "text_columns": ["source", "traits", "action", "trigger", "prerequisite", "requirements", "cost",
+                     "critical_success", "success", "failure", "critical_failure"],
+    "model_columns": ["name", "subtype", "nethys_url", "action", "trigger", "prerequisite", "requirements",
+                      "critical_success", "success", "failure", "critical_failure", "cost", "description",
+                      "source__fk", "source_page"],
+    "through_columns": ["name", "x_finder_related_model", "x_finder_related_item", "traits"],
+    "nested": true
+  },
+  "ancestries": {
+    "app": "core",
+    "text_columns": ["source", "traits", "you_might...", "others_probably...", "physical_description", "society", "beliefs", "names", "sample_names", "hit_points", "size", "speed", "attribute_boosts", "attribute_flaw", "languages", "ethnicities"],
+    "model_columns": ["name", "nethys_url", "traits__tt_and", "hit_points", "size", "speed", "attribute_flaw", "attribute_bonus_1", "attribute_bonus_2", "free_bonus", "free_languages", "languages__tt_and", "languages__tt_or", "augmented_sense", "special", "you_might", "others_probably", "physical_description", "common_names", "society", "beliefs", "description", "source__fk", "source_page"],
+    "nested_columns": ["augmented_sense", "augmented_description", "special", "special"],
+    "through_columns": ["name", "spoken_languages", "language_list", "traits"],
+    "start_tags": ["b", "h2", "h3"],
+    "end_tags": ["h1", "h2", "h3", "i"],
+    "title_tags": []
+  },
+  "armor": {
+    "app": "core",
+    "text_columns": ["source", "category", "group", "traits", "price", "ac_bonus", "dex_cap", "check_penalty", "speed_penalty", "bulk", "strength", "level"],
+    "model_columns": ["name", "nethys_url", "category", "group", "price", "ac_bonus", "dex_cap", "check_penalty", "speed_penalty", "bulk", "strength", "level", "description", "source__fk", "source_page"],
+    "through_columns": ["name", "traits"]
+  },
+  "armor_specialization_effects": {
+    "app": "core",
+    "nested_columns": ["armor_group", "effect"],
+    "model_columns": ["name", "effect", "source__fk", "source_page"],
+    "nested": true
+  },
+  "companions": {
+    "app": "core",
+    "text_columns": ["source", "size", "str", "dex", "con", "int", "wis", "cha", "hit_points", "skill", "senses", "speed", "special", "support_benefit", "advanced_maneuver"],
+    "model_columns": ["name", "nethys_url", "size", "str", "dex", "con", "int", "wis", "cha", "hit_points", "skill", "senses", "speed", "special", "support_benefit", "advanced_maneuver", "description", "source__fk", "source_page"]
+  },
+  "animal_attacks": {
+    "app": "core",
+    "text_columns": ["source", "melee", "ranged", "damage", "action"],
+    "model_columns": ["name", "nethys_url", "melee", "ranged", "damage", "action", "x_finder_related_model", "description", "source__fk", "source_page", "x_finder_related_item__fk"],
+    "nested": true
+  },
+  "arcane_schools": {
+    "app": "core",
+    "text_columns": ["source", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial", "advanced", "curriculum", "school_spells", "no_curriculum"],
+    "model_columns": ["name", "nethys_url", "initial_focus__fk", "advanced_focus__fk", "description", "source__fk", "source_page"],
+    "through_columns": ["name", "cantrips", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"],
+    "start_tags": ["b", null],
+    "end_tags": ["b", "br"],
+    "desc_tags": [],
+    "title_tags": []
+  },
+  "arcane_thesis": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "archetypes": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "backgrounds": {
+    "app": "core",
+    "text_columns": ["source", "free", "skill", "lore", "skill_feat"],
+    "check_columns": ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+    "model_columns": ["name", "nethys_url", "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma", "free", "skill", "lore", "skill_feat", "description", "source__fk", "source_page"]
+  },
+  "bloodlines": {"app": "core",
+    "text_columns": ["source", "tradition", "bloodline_skills", "sorcerous_gifts", "bloodline_spells", "blood_magic"],
+    "model_columns": ["name", "nethys_url", "tradition", "skills", "cantrip", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "initial_focus", "advanced_focus", "greater_focus", "blood_magic", "description", "source__fk", "source_page"],
+    "end_tags": ["div", "br"]
+  },
+  "causes": {"app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "first_cause_tenet", "second_cause_tenet", "cause_spell__fk", "champions_reaction", "divine_smite", "exalt", "description", "source__fk", "source_page"],
+    "name_nest": "alignement"
+  },
+  "classes": {
+    "app": "core",
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div", "i"],
+    "text_columns": ["source", "key_attribute", "hit_points", "during_combat_encounters...", "during_social_encounters...", "while_exploring...", "in_downtime...", "you_might...", "others_probably...", "initial_proficiencies", "perception", "saving_throws", "skills", "attacks", "defenses", "spells", "class_dc"],
+    "model_columns": ["name", "nethys_url", "key_attribute", "alt_key_attribute", "hit_points", "perception", "fortitude", "reflex", "will", "skills__tt_or", "free_skills", "unarmed", "simple", "martial", "advanced", "favored", "unarmored", "light", "medium", "heavy", "spells", "class_dc", "during_combat_encounters", "during_social_encounters", "while_exploring", "in_downtime", "you_might", "others_probably", "description", "source__fk", "source_page"]
+  },
+  "class_features": {
+    "app": "core",
+    "text_columns": ["level"],
+    "start_tags": ["h2"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],
+    "title_tags": ["h1", "h2"],
+    "nested": true
+  },
+  "class_kits": {
+    "app": "core",
+    "text_columns": ["source", "price", "bulk", "armor", "weapons", "options", "money_left_over"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "class_optional_features": {
+    "app": "core",
+    "text_columns": ["level"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3", "table", "div"],
+    "nested": true
+  },
+  "class_samples": {
+    "app": "core",
+    "title_tags": [],
+    "start_tags": ["b", "h2"],
+    "overload": true,
+    "subtype": "class",
+    "text_columns" : ["source", "attribute_scores", "skills", "starting_feat", "higher_level_feats"],
+    "model_columns": ["name", "nethys_url", "subclass", "class", "attribute_scores", "skills", "starting_feat", "higher_level_feats", "description", "source__fk", "source_page"]
+  },
+  "conditions": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "deities": {
+    "app": "campaign",
+    "text_columns": ["source", "category", "edicts", "anathema", "areas_of_concern", "religious_symbol", "sacred_animal", "sacred_color", "pantheons", "divine_attribute", "divine_font", "divine_sanctification", "divine_skill", "favored_weapon", "domains", "alternate_domains", "cleric_spells"],
+    "model_columns": ["name", "nethys_url", "aka", "category", "edicts", "anathema", "areas_of_concern", "religious_symbol", "sacred_animal", "sacred_color", "divine_attribute", "divine_font", "divine_sanctification", "divine_skill", "favored_weapon__fk", "first_cleric_spell__fk", "first_cleric_spell_rank", "second_cleric_spell__fk", "second_cleric_spell_rank", "third_cleric_spell__fk", "third_cleric_spell_rank", "description", "source__fk", "source_page"],
+    "through_columns": ["name", "domains", "alternate_domains"],
+    "subtype": "aka"
+  },
+  "diseases": {
+    "app": "core",
+    "text_columns": ["source", "traits", "level", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5"],
+    "model_columns": ["name", "nethys_url", "traits", "level", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5", "description", "x_finder_related_model", "x_finder_related_item__fk", "source__fk", "source_page"],
+    "through_columns": ["name", "traits"],
+    "nested": true
+  },
+  "divine_intercession": {
+    "app": "campaign",
+    "text_columns": ["source", "minor_boon", "moderate_boon", "major_boon", "minor_curse", "moderate_curse", "major_curse"],
+    "model_columns": ["name", "nethys_url", "minor_boon", "moderate_boon", "major_boon", "minor_curse", "moderate_curse", "major_curse", "description", "x_finder_related_model", "source__fk", "source_page"],
+    "nested": true
+  },
+  "doctrines": {
+    "app": "core",
+    "text_columns": ["source", "first_doctrine", "second_doctrine", "third_doctrine", "fourth_doctrine", "fifth_doctrine", "final_doctrine"],
+    "model_columns": ["name", "nethys_url", "first_doctrine", "second_doctrine", "third_doctrine", "fourth_doctrine", "fifth_doctrine", "final_doctrine", "description", "source__fk", "source_page"]
+  },
+  "domains": {
+    "app": "campaign",
+    "text_columns": ["source", "deities", "domain_spell", "advanced_domain_spell", "apocryphal_domain_spell", "advanced_apocryphal_domain_spell"],
+    "model_columns": ["name", "nethys_url", "domain_spell__fk", "advanced_domain_spell__fk", "apocryphal_domain_spell__fk", "advanced_apocryphal_domain_spell__fk", "description", "source__fk", "source_page"]
+  },
+  "druidic_orders": {
+    "app": "core",
+    "text_columns": ["source", "order_skill", "druid_feat", "order_spell", "anathema"],
+    "model_columns": ["name", "nethys_url", "skills", "feat", "focus_spell", "anathema", "description", "source_fk", "source_page"]
+  },
+  "equipment": {
+    "app": "core",
+    "text_columns": ["source", "price", "bulk", "hands", "usage", "ammunition", "craft_requirements", "requirements", "capacity", "access", "critical_success", "success", "failure", "critical_failure", "level"],
+    "model_columns": ["name", "nethys_url", "price", "bulk", "hands", "usage", "ammunition", "craft_requirements", "capacity", "level", "access", "description", "source__fk", "source_page"],
+    "subtype": "quality"
+  },
+  "equipment_activations": {
+    "app": "core",
+    "text_columns": ["source", "activate", "trigger", "frequency", "effect", "critical_success", "success", "failure", "critical_failure"],
+    "model_columns": ["name", "nethys_url", "activate", "trigger", "frequency", "effect", "critical_success", "success", "failure", "critical_failure", "description", "x_finder_related_model", "x_finder_related_item__fk", "source__fk", "source_page"],
+    "no_description": true,
+    "nested": true
+  },
+  "familiars": {"app": "core",
+    "text_columns": ["source", "ability_type"],
+    "model_columns": ["name", "nethys_url", "ability_type", "description", "source_fk", "source_page"]
+  },
+  "feats": {
+    "app": "core",
+    "text_columns": ["source", "traits", "archetype", "action", "trigger", "requirements", "prerequisites", "cost", "special", "critical_success", "success", "failure", "critical_failure", "level"],
+    "model_columns": ["name", "nethys_url", "traits__tt_and", "archetype", "action", "requirements", "prerequisites", "cost", "special", "critical_success", "success", "failure", "critical_failure", "level", "description", "source__fk", "source_page"],
+    "through_columns": []
+  },
+  "hazards": {
+    "app": "core",
+    "text_columns": ["source", "traits", "level", "complexity", "stealth", "description", "disable", "routine", "reset", "ac", "for", "ref", "hardness", "hp"],
+    "model_columns": ["name", "nethys_url", "traits", "level", "complexity", "stealth", "disable", "routine", "reset", "ac", "for", "ref", "hardness", "hp", "description", "source__fk", "source_page"]
+  },
+  "heritages": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "ancestrie__fk", "description", "links", "source__fk", "source_page"]
+  },
+  "hunters_edges": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "instincts": {
+    "app": "core",
+    "text_columns": ["source", "anathema", "instinct_ability", "specialization_ability", "raging_resistance"],
+    "model_columns": ["name", "nethys_url", "anathema", "instinct_ability", "specialization_ability", "raging_resistance", "description", "source__fk", "source_page"]
+  },
+  "key_terms": {
+    "app": "core",
+    "text_columns": [],
+    "model_excluded_columns": ["name", "nethys_url"],
+    "overload": true,
+    "nested": true,
+    "start_tags": ["b", "h2"],
+    "end_tags": ["b", "hr", "h1", "h2", "h3"],
+    "desc_tags": ["b", "u", "i", "ol", "ul"]
+  },
+  "languages": {
+    "app": "core",
+    "text_columns": ["source", "creatures", "ancestries", "npcs", "regions"],
+    "model_columns": ["name", "nethys_url", "subtype", "description", "ancestries__tt_and", "creatures__tt_and", "regions__tt_and", "source__fk", "source_page"],
+    "start_tags": ["b", "h2"]
+  },
+  "lessons": {
+    "app": "core",
+    "text_columns": ["source", "lesson_type"],
+    "model_columns": ["name", "nethys_url", "type", "focus_spell", "bonus spell", "description", "source__fk", "source_page"]
+  },
+  "patrons": {
+    "app": "core",
+    "overload": true,
+    "text_columns": ["source", "spell_list", "patron_skill"],
+    "model_columns": ["name", "nethys_url","spell_list", "skill", "description", "source__fk", "source_page"]
+  },
+  "monsters": {
+    "app": "core",
+    "text_columns": ["source", "traits", "level", "recall_knowledge", "unspecific_lore", "specific_lore", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "weaknesses", "speed"],
+    "model_columns": ["name", "nethys_url", "traits", "cr", "recall_knowledge_skill", "skill_dc", "unspecific_lore_dc", "specific_lore_dc", "perception", "languages", "skills", "str", "dex", "con", "int", "wis", "cha", "items", "ac", "fort", "ref", "will", "hp", "immunities", "resistances", "weaknesses", "speed", "description", "source__fk", "source_page"],
+    "title_tags": ["h3"]
+  },
+  "monster_abilities": {
+    "app": "core",
+    "text_columns": ["source", "action", "trigger", "effect", "requirements", "frequency", "critical_success", "success", "failure", "critical_failure", "alternative_abilities"],
+    "model_columns": ["name", "nethys_url", "subtype", "action", "trigger", "effect", "requirements", "frequency", "critical_success", "success", "failure", "critical_failure", "alternative_abilities", "source", "source_page", "x_finder_related_item", "x_finder_related_model", "description"],
+    "nested": true
+  },
+  "monster_attacks": {
+    "app": "core",
+    "text_columns": ["source", "melee", "ranged", "damage", "action", "traits"],
+    "model_columns": ["name", "nethys_url", "melee", "ranged", "damage", "action", "traits", "x_finder_related_item", "x_finder_related_model", "description", "source__fk", "source_page"],
+    "nested": true
+  },
+  "monster_spells": {
+    "app": "core",
+    "text_columns": ["source", "10th", "9th", "8th", "7th", "6th", "5th", "4th", "3rd", "2nd", "1st", "cantrips", "constant"],
+    "model_columns": ["name", "nethys_url", "x_finder_related_item", "x_finder_related_model", "description", "source__fk", "source_page"],
+    "nested": true
+  },
+  "muses": {
+    "app": "core",
+    "text_columns": ["source", "muse_feat", "muse_spell"],
+    "model_columns": ["name", "nethys_url", "bonus_spell", "bonus_feat", "description", "source__fk", "source_page"]
+  },
+  "mysteries": {"app": "core",
+    "text_columns": ["source", "granted_spells", "revelation_spells", "related_domains", "mystery_skill", "oracle_feat"],
+    "model_columns": ["name", "nethys_url", "bonus_feat", "skills", "granted_cantrip", "granted_1", "granted_2", "granted_3", "granted_4", "granted_5", "granted_6", "granted_7", "granted_8", "granted_9", "initial_focus_spell", "advanced_focus_spell", "greater_focus_spell", "domains", "description", "source__fk", "source_page"],
+    "end_tags": ["div", "br"]
+  },
+  "poisons": {
+    "app": "core",
+    "text_columns": ["source", "traits", "level", "saving_throw", "onset", "maximum_duration", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5"],
+    "model_columns": ["name", "nethys_url", "traits", "saving_throw", "save_dc", "onset", "maximum_duration", "stage_1", "stage_2", "stage_3", "stage_4", "stage_5", "description", "source__fk", "source_page"]
+  },
+  "rackets": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "bonus_skill", "key_attribute", "description", "source__fk", "source_page"]
+  },
+  "research_fields": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "description", "source__fk", "source_page"]
+  },
+  "rituals": {
+    "app": "core",
+    "text_columns": ["source", "traits", "level", "cast", "cost", "secondary_casters", "primary_check", "secondary_checks", "range", "target", "area", "critical_success", "success", "failure", "critical_failure", "heightened"],
+    "model_columns": ["name", "nethys_url", "traits", "level", "cast", "cost", "secondary_casters", "primary_check", "secondary_checks", "range", "target", "area", "critical_success", "success", "failure", "critical_failure", "heightened", "description", "source__fk", "source_page"]
+  },
+  "sample_tasks": {
+    "app": "core",
+    "text_columns": ["untrained", "trained", "expert", "master", "legendary"],
+    "model_columns": ["name", "untrained", "trained", "expert", "master", "legendary", "x_finder_related_item", "x_finder_related_model", "description"],
+    "nested": true
+  },
+  "shields": {
+    "app": "core",
+    "text_columns": ["source", "ac_bonus", "speed_penalty", "hardness", "hp", "bulk", "price"],
+    "model_columns": ["name", "ac_bonus", "speed_penalty", "hardness", "hp", "bulk", "price", "description", "source__fk", "source_page"]
+  },
+  "skills": {
+    "app": "core",
+    "text_columns": ["source", "subtype"],
+    "model_columns": ["name", "nethys_url", "attribute", "description", "source__fk", "source_page"],
+    "title_tags": ["h1", "h3"],
+    "subtype": "attribute"
+  },
+  "skills_general": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "prerequisite", "source__fk", "source_page", "description"],
+    "title_tags": ["h1", "h2", "h3"],
+    "subtype": "prerequisite"
+  },
+  "skill_uses": {
+    "app": "core",
+    "text_columns": [],
+    "model_columns": ["name", "nethys_url", "description", "x_finder_related_item", "x_finder_related_model"],
+    "title_tags": ["h1", "h2", "h3", "u"],
+    "start_tags": ["b"],
+    "end_tags": ["a", "b", "u", "h1", "h2", "h3"],
+    "overload": true,
+    "nested": true
+  },
+  "spells": {
+    "app": "core",
+    "text_columns": ["source", "traits", "traditions", "bloodline", "deities", "deity", "domain", "cast", "trigger", "range", "area", "defense", "targets", "duration", "requirements", "heightened", "critical_success", "success", "failure", "critical_failure", "level", "spell_type"],
+    "model_columns": ["name", "nethys_url", "level", "traits__tt_and", "arcane", "divine", "occult", "primal", "spell_type", "action", "cast", "trigger", "range", "area", "defense", "targets", "duration", "requirements", "critical_success", "success", "failure", "critical_failure", "heightened", "description", "source__fk", "source_page"],
+    "through_columns": [],
+    "traits": true
+  },
+  "tenets": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "nethys_url", "first_tenet", "second_tenet", "description", "source__fk", "source_page"]
+  },
+  "traits": {
+    "app": "core",
+    "text_columns": ["source"],
+    "model_columns": ["name", "subtype", "nethys_url", "source_page", "description", "source__fk", "source_page"],
+    "subtype": "subtype"
+  },
+  "weapons": {
+    "app": "core",
+    "text_columns": ["source", "traits", "favored_weapon", "price", "damage", "bulk", "hands", "type", "category", "group", "range", "reload", "ammunition", "level"],
+    "model_columns": ["name", "nethys_url", "traits__tt_and", "type", "category", "weapon_group__fk", "hands", "damage_dice_number", "damage_dice_size", "damage_type", "range", "reload", "level", "price", "description", "source__fk", "source_page"],
+    "through_columns": [],
+    "traits": true
+},
+  "critical_specialization_effects": {
+    "app": "core",
+    "nested_columns": ["weapon_group", "effect"],
+    "model_columns": ["name", "effect", "source__fk", "source_page"],
+    "nested": true
+  }
+}

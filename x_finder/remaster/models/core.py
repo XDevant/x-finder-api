@@ -1,5 +1,5 @@
 from remaster.models.base import Base, Attribute, Proficiency, Size
-from django.db.models import (PROTECT, CASCADE, ForeignKey, CharField, URLField, DateField, TextField, PositiveSmallIntegerField,
+from django.db.models import (PROTECT, CASCADE, ForeignKey, CharField, IntegerField, URLField, DateField, TextField, PositiveSmallIntegerField,
                               ManyToManyField, BooleanField)
 from django.contrib.admin import display
 
@@ -84,7 +84,7 @@ class Skill(Base):
 
 class AncestryFeat(Base):
     """Model for all ancestry feats, either tied to an ancestry or a versatile héritage, who each have their own TT"""
-    level = PositiveSmallIntegerField(choices={1: 1, 5: 5, 9: 9, 13: 13, 17: 17}, default=1)
+    level = PositiveSmallIntegerField(choices=[(1, "1"), (5, "5"), (9, "9"), (13, "13"), (17, "17")], default=1)
     source = ForeignKey(to=Source, on_delete=PROTECT, related_name='ancestry_feat_source')
     source_page = PositiveSmallIntegerField(default=0)
     traits = ManyToManyField(Trait, through='AncestryFeatTrait')
@@ -268,14 +268,25 @@ class Condition(Base):
 class Creature(Base):
     pass
 
+
 class Curse(Base):
     pass
+
 
 class Disease(Base):
     pass
 
-class Equipment(Base):
-    pass
+
+class EquipmentOld(Base):
+    bulk = PositiveSmallIntegerField(default=0)
+    price = PositiveSmallIntegerField(default=0)
+    level = PositiveSmallIntegerField(default=0)
+    hardness = PositiveSmallIntegerField(default=0)
+    hit_points = PositiveSmallIntegerField(default=0)
+    hands = PositiveSmallIntegerField(default=0)
+    usage = CharField(max_length=25, default="-")
+    traits = ManyToManyField(Trait, through='EquipmentTrait', related_name='equipment_traits')
+
 
 class Familiar(Base):
     pass
@@ -314,63 +325,6 @@ class VersatileHeritage(Feature):
 
 class Poison(Base):
     pass
-
-class Ritual(Base):
-    rank = PositiveSmallIntegerField(default=1)
-
-class Spell(Base):
-    rank = PositiveSmallIntegerField(default=1)
-    arcane = BooleanField(default=False)
-    divine = BooleanField(default=False)
-    occult = BooleanField(default=False)
-    primal = BooleanField(default=False)
-    spell_type = CharField(blank=True, default="")
-    action = CharField(blank=True, default="")
-    cast = CharField(blank=True, default="")
-    trigger = CharField(blank=True, default="")
-    range = CharField(blank=True, default="")
-    area = CharField(blank=True, default="")
-    defense = CharField(blank=True, default="")
-    targets = CharField(blank=True, default="")
-    duration = CharField(blank=True, default="")
-    requirements = CharField(blank=True, default="")
-    critical_success = CharField(blank=True, default="")
-    success = CharField(blank=True, default="")
-    failure = CharField(blank=True, default="")
-    critical_failure = CharField(blank=True, default="")
-    heightened = CharField(blank=True, default="")
-    traits = ManyToManyField(Trait, through='SpellTrait', related_name='spell_traits')
-    source = ForeignKey(
-        to=Source,
-        on_delete=PROTECT,
-        related_name='spell_source',
-        default=None,
-        null=True
-    )
-    source_page = PositiveSmallIntegerField(default=0)
-
-    @property
-    def traditions(self):
-        answer = []
-        for tradition in ["arcane", "divine", "occult", "primal"]:
-            if self.__getattribute__(tradition):
-                answer.append(tradition)
-        return answer
-
-
-class Domain(Base):
-    domain_spell = ForeignKey(to=Spell,
-                              on_delete=PROTECT,
-                              related_name='domain_spell',
-                              default=None,
-                              null=True)
-    advanced_domain_spell = ForeignKey(to=Spell,
-                                       on_delete=PROTECT,
-                                       related_name='advanced_domain_spell',
-                                       default=None,
-                                       null=True)
-    source = ForeignKey(to=Source, on_delete=PROTECT, default=None, null=True, related_name="domain_source")
-    source_page = PositiveSmallIntegerField(default=0)
 
 
 class SubClass(Base):

@@ -1,5 +1,6 @@
 from django.urls import path, include
-from rest_framework_nested.routers import DefaultRouter, NestedSimpleRouter
+from rest_framework_nested.routers import NestedSimpleRouter
+from rest_framework.routers import DefaultRouter
 
 from .views import (SourceViewSet, TraitViewSet, FeatureViewSet, ClasseViewSet, AncestrieViewSet, ArchetypeViewSet,
                     BackgroundViewSet, VersatileHeritageViewSet, SkillViewSet, DomainViewSet, DeitieViewSet, CurseViewSet,
